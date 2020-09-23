@@ -1,6 +1,10 @@
 use std::ffi::CString;
+use std::path::PathBuf;
 
 use anyhow::Result;
+use hyperscan::prelude::{Pattern, Patterns};
+use hyperscan::{ExprExt, PatternFlags};
+use rusqlite::{params, Connection};
 
 use crate::ffi::ua_info;
 
@@ -31,7 +35,60 @@ impl Udger {
         }
     }
 
-    pub fn init() {}
+    pub fn init(&mut self, db_path: PathBuf) -> Result<()> {
+        let conn = Connection::open(db_path)?;
+
+        Udger::init_word_detector(
+            &mut self.application_words_detector,
+            &String::from("udger_application_regex_words"),
+            &conn,
+        )?;
+
+        Udger::init_word_detector(
+            &mut self.client_words_detector,
+            &String::from("udger_client_regex_words"),
+            &conn,
+        )?;
+
+        Udger::init_word_detector(
+            &mut self.device_class_words_detector,
+            &String::from("udger_deviceclass_regex_words"),
+            &conn,
+        )?;
+
+        Udger::init_word_detector(
+            &mut self.os_words_detector,
+            &String::from("udger_os_regex_words"),
+            &conn,
+        )?;
+
+        Ok(())
+    }
+
+    fn init_word_detector(
+        detector: &mut WordDetector,
+        table: &String,
+        conn: &Connection,
+    ) -> Result<()> {
+        let mut stmt = conn.prepare(format!("SELECT id, word FROM {}", table).as_str())?;
+        let words: Vec<Pattern> = stmt
+            .query_map(params![], |row| {
+                let expression: String = row.get(1)?;
+                let id: i32 = row.get(0)?;
+                Ok(Pattern {
+                    expression,
+                    flags: PatternFlags::CASELESS,
+                    id: Some(id as usize),
+                    ext: ExprExt::default(),
+                    som: None,
+                })
+            })?
+            .map(|e| e.unwrap())
+            .collect();
+
+        detector.init(Patterns::from(words))?;
+        Ok(())
+    }
 
     pub fn alloc_udger_data(&self) -> Result<UdgerData> {
         Ok(UdgerData {
