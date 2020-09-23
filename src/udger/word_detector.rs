@@ -1,34 +1,25 @@
 use anyhow::{anyhow, Result};
 use hyperscan::prelude::*;
-use hyperscan::{ExprExt, PatternFlags};
 use rusqlite::{params, Connection};
-
-use std::collections::HashMap;
-use std::fmt;
 
 pub type WordID = u16;
 
-#[derive(Clone)]
-pub struct Word {
-    pub id: i32,
-    pub word: String, // !! ascii character only !!
+pub struct WordDetectorScratch {
+    pub name: String,
+    pub raw: Scratch,
 }
 
-impl Word {
-    pub fn new(id: i32, word: String) -> Word {
-        Word { id, word }
-    }
-}
-
-impl fmt::Display for Word {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "({}, {})", self.id, self.word)
+impl WordDetectorScratch {
+    pub fn new(name: String, scratch: Scratch) -> WordDetectorScratch {
+        WordDetectorScratch {
+            name: String::new(),
+            raw: scratch,
+        }
     }
 }
 
 pub struct WordDetector {
     pub name: String,
-    word_dic: HashMap<String, Vec<Word>>,
     db: Option<hyperscan::BlockDatabase>,
 }
 
@@ -37,7 +28,6 @@ impl WordDetector {
     pub fn new() -> WordDetector {
         WordDetector {
             name: String::new(),
-            word_dic: HashMap::new(),
             db: None,
         }
     }
@@ -51,17 +41,20 @@ impl WordDetector {
     }
 
     /// Allocate hyperscan scratch for regular expression matching
-    pub fn alloc_scratch(&mut self) -> Result<Scratch> {
+    pub fn alloc_scratch(&self) -> Result<WordDetectorScratch> {
         match &self.db {
             None => Err(anyhow!("WordDetector's database is None")),
-            Some(db) => Ok(db.alloc_scratch()?),
+            Some(db) => Ok(WordDetectorScratch::new(
+                self.name.clone(),
+                db.alloc_scratch()?,
+            )),
         }
     }
 
     /// Match words table
     ///
     /// If User-Agent match any word, return all the matched words' ids.
-    pub fn get_word_ids<T>(&self, ua: T, scratch: &mut Scratch) -> Result<Vec<WordID>>
+    pub fn get_word_ids<T>(&self, ua: T, scratch: &mut WordDetectorScratch) -> Result<Vec<WordID>>
     where
         T: AsRef<[u8]>,
     {
@@ -70,7 +63,7 @@ impl WordDetector {
         match &self.db {
             None => {}
             Some(db) => {
-                db.scan(ua.as_ref(), scratch, |id, _, _, _| {
+                db.scan(ua.as_ref(), &mut scratch.raw, |id, _, _, _| {
                     ids.push(id as u16);
                     Matching::Continue
                 })?;
@@ -83,6 +76,8 @@ impl WordDetector {
 
 #[cfg(test)]
 mod tests {
+    use hyperscan::{ExprExt, PatternFlags};
+
     use super::*;
 
     #[test]
