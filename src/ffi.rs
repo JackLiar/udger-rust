@@ -2,7 +2,6 @@ use std::ffi::CString;
 use std::os::raw::c_char;
 
 #[repr(C)]
-#[no_mangle]
 #[derive(Default)]
 pub struct ua_info {
     pub class_id: u8,
