@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use hyperscan::prelude::*;
-use rusqlite::{params, Connection};
 
 pub type WordID = u16;
 
@@ -12,7 +11,7 @@ pub struct WordDetectorScratch {
 impl WordDetectorScratch {
     pub fn new(name: String, scratch: Scratch) -> WordDetectorScratch {
         WordDetectorScratch {
-            name: String::new(),
+            name: name,
             raw: scratch,
         }
     }
