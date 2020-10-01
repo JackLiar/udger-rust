@@ -17,6 +17,7 @@ impl WordDetectorScratch {
     }
 }
 
+#[derive(Default)]
 pub struct WordDetector {
     pub name: String,
     db: Option<hyperscan::BlockDatabase>,
@@ -25,10 +26,7 @@ pub struct WordDetector {
 impl WordDetector {
     /// Create a new WordDetector
     pub fn new() -> WordDetector {
-        WordDetector {
-            name: String::new(),
-            db: None,
-        }
+        WordDetector::default()
     }
 
     /// Initialize a WordDetector
