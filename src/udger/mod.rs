@@ -18,7 +18,11 @@ pub struct UdgerData {
     pub os_word_scratch: WordDetectorScratch,
 }
 
+#[derive(Default)]
 pub struct Udger {
+    capacity: u16,
+    conn: Option<Connection>,
+
     application_words_detector: WordDetector,
     client_words_detector: WordDetector,
     device_class_words_detector: WordDetector,
@@ -27,15 +31,14 @@ pub struct Udger {
 
 impl Udger {
     pub fn new() -> Udger {
-        Udger {
-            application_words_detector: WordDetector::new(),
-            client_words_detector: WordDetector::new(),
-            device_class_words_detector: WordDetector::new(),
-            os_words_detector: WordDetector::new(),
-        }
+        let mut udger = Udger::default();
+        udger.capacity = 10000;
+        udger
     }
 
-    pub fn init(&mut self, db_path: PathBuf) -> Result<()> {
+    pub fn init(&mut self, db_path: PathBuf, capacity: u16) -> Result<()> {
+        self.capacity = capacity;
+
         let conn = Connection::open(db_path)?;
 
         Udger::init_word_detector(
