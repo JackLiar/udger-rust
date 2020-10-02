@@ -1,4 +1,3 @@
-use std::ffi::CString;
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -6,7 +5,7 @@ use hyperscan::prelude::{Pattern, Patterns};
 use hyperscan::{ExprExt, PatternFlags};
 use rusqlite::{params, Connection};
 
-use crate::ffi::ua_info;
+use crate::ffi::UaInfo;
 
 mod word_detector;
 use self::word_detector::{WordDetector, WordDetectorScratch};
@@ -102,7 +101,7 @@ impl Udger {
         })
     }
 
-    fn detect_client<T>(&self, ua: T, data: &mut UdgerData, _info: &mut ua_info) -> Result<()>
+    fn detect_client<T>(&self, ua: T, data: &mut UdgerData, info: &mut UaInfo) -> Result<()>
     where
         T: AsRef<[u8]>,
     {
@@ -111,7 +110,7 @@ impl Udger {
         Ok(())
     }
 
-    fn detect_os<T>(&self, ua: T, data: &mut UdgerData, _info: &mut ua_info) -> Result<()>
+    fn detect_os<T>(&self, ua: T, data: &mut UdgerData, _info: &mut UaInfo) -> Result<()>
     where
         T: AsRef<[u8]>,
     {
@@ -120,7 +119,7 @@ impl Udger {
         Ok(())
     }
 
-    fn detect_device<T>(&self, ua: T, data: &mut UdgerData, _info: &mut ua_info) -> Result<()>
+    fn detect_device<T>(&self, ua: T, data: &mut UdgerData, _info: &mut UaInfo) -> Result<()>
     where
         T: AsRef<[u8]>,
     {
@@ -129,7 +128,7 @@ impl Udger {
         Ok(())
     }
 
-    fn detect_application<T>(&self, ua: T, data: &mut UdgerData, _info: &mut ua_info) -> Result<()>
+    fn detect_application<T>(&self, ua: T, data: &mut UdgerData, _info: &mut UaInfo) -> Result<()>
     where
         T: AsRef<[u8]>,
     {
@@ -138,12 +137,16 @@ impl Udger {
         Ok(())
     }
 
-    pub fn parse_ua<T>(&self, ua: T, data: &mut UdgerData, info: &mut ua_info) -> Result<()>
+    pub fn parse_ua<T>(&self, ua: T, data: &mut UdgerData, info: &mut UaInfo) -> Result<()>
     where
         T: AsRef<[u8]>,
     {
         unsafe {
-            info.ua = CString::from_raw(ua.as_ref().as_ptr() as *mut i8);
+            // We need to find a better way/strategy to handle un-utf8 input
+            let buf = ua.as_ref();
+            let vec = Vec::from_raw_parts(buf.as_ptr() as *mut u8, buf.len(), buf.len());
+            info.ua = String::from_utf8_lossy(&vec).to_owned().to_string();
+            // String::from_raw
         }
         self.detect_client(&ua, data, info)?;
         self.detect_os(&ua, data, info)?;
