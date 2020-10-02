@@ -19,6 +19,12 @@ pub struct UdgerData {
     pub client_word_scratch: WordDetectorScratch,
     pub device_word_scratch: WordDetectorScratch,
     pub os_word_scratch: WordDetectorScratch,
+
+    pub app_regex_scratch: RegexSequenceScratch,
+    pub client_regex_scratch: RegexSequenceScratch,
+    pub device_class_regex_scratch: RegexSequenceScratch,
+    pub device_name_regex_scratch: RegexSequenceScratch,
+    pub os_regex_scratch: RegexSequenceScratch,
 }
 
 #[derive(Default)]
@@ -198,6 +204,11 @@ impl Udger {
             client_word_scratch: self.client_words_detector.alloc_scratch()?,
             device_word_scratch: self.device_class_words_detector.alloc_scratch()?,
             os_word_scratch: self.os_words_detector.alloc_scratch()?,
+            app_regex_scratch: self.application_regexes.alloc_scratch()?,
+            client_regex_scratch: self.client_regexes.alloc_scratch()?,
+            device_class_regex_scratch: self.device_class_regexes.alloc_scratch()?,
+            device_name_regex_scratch: self.device_name_regexes.alloc_scratch()?,
+            os_regex_scratch: self.os_regexes.alloc_scratch()?,
         })
     }
 
