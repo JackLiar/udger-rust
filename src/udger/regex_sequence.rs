@@ -29,6 +29,7 @@ pub struct RegexSequence {
     db: Option<Database>,
     id_word_map: HashMap<u16, Vec<u16>>,
     id_sequence_map: HashMap<u16, u16>,
+    rowid_id_map: HashMap<u16, u16>,
 }
 
 impl RegexSequence {
@@ -39,6 +40,7 @@ impl RegexSequence {
     /// Initialize a RegexSequence
     pub fn init<'a, R, I, S>(
         &mut self,
+        rowids: I,
         ids: I,
         regexes: S,
         sequences: I,
@@ -51,16 +53,21 @@ impl RegexSequence {
         S: Iterator<Item = R>,
     {
         let mut patterns = Vec::new();
-        let tup = ids.zip(regexes).zip(sequences).zip(word1s).zip(word2s);
-        tup.for_each(|((((id, regex), seq), word1), word2)| {
+        let tup = rowids
+            .zip(ids)
+            .zip(regexes)
+            .zip(sequences)
+            .zip(word1s)
+            .zip(word2s);
+        tup.for_each(|(((((rowid, id), regex), seq), word1), word2)| {
             patterns.push(Pattern {
                 expression: String::from(regex.as_ref()),
                 flags: Flags::CASELESS,
-                id: Some(*id as usize),
+                id: Some(*rowid as usize),
             });
 
             // add new entry for <id, sequence> map
-            self.id_sequence_map.insert(*id, *seq);
+            self.id_sequence_map.insert(*rowid, *seq);
 
             // add word entry for <id, word> map
             let mut word_vec = Vec::new();
@@ -70,7 +77,8 @@ impl RegexSequence {
             if *word2 != 0 {
                 word_vec.push(*word2);
             }
-            self.id_word_map.insert(*id, word_vec);
+            self.id_word_map.insert(*rowid, word_vec);
+            self.rowid_id_map.insert(*rowid, *id);
         });
 
         self.db = Some(Patterns::from(patterns).build()?);
@@ -160,6 +168,13 @@ impl RegexSequence {
 
         Ok(None)
     }
+
+    pub fn get_id(self, row_id: u16) -> Option<u16> {
+        match self.rowid_id_map.get(&row_id) {
+            None => None,
+            Some(id) => Some(*id),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -170,6 +185,7 @@ mod tests {
     fn test_get_word_ids() {
         let mut regex_seq = RegexSequence::new();
 
+        let rowids: Vec<u16> = vec![0];
         let ids: Vec<u16> = vec![1];
         let regexes = vec![r"(regex)"];
         let sequences: Vec<u16> = vec![10];
@@ -178,6 +194,7 @@ mod tests {
 
         regex_seq
             .init(
+                rowids.iter(),
                 ids.iter(),
                 regexes.iter(),
                 sequences.iter(),
@@ -198,13 +215,14 @@ mod tests {
             .unwrap();
 
         assert!(matches!(id, Some(_)));
-        assert_eq!(id.unwrap(), 1);
+        assert_eq!(id.unwrap(), 0);
     }
 
     #[test]
     fn test_get_word_ids_returns_none() {
         let mut regex_seq = RegexSequence::new();
 
+        let rowids: Vec<u16> = vec![0];
         let ids: Vec<u16> = vec![1];
         let regexes = vec![r"(regexes)"];
         let sequences: Vec<u16> = vec![10];
@@ -213,6 +231,7 @@ mod tests {
 
         regex_seq
             .init(
+                rowids.iter(),
                 ids.iter(),
                 regexes.iter(),
                 sequences.iter(),
@@ -239,6 +258,7 @@ mod tests {
     fn test_get_word_ids_multiple_id() {
         let mut regex_seq = RegexSequence::new();
 
+        let rowids: Vec<u16> = vec![0, 1];
         let ids: Vec<u16> = vec![1, 2];
         let regexes = vec![r"(regex)", r"\s(regex)"];
         let sequences: Vec<u16> = vec![10, 20];
@@ -247,6 +267,7 @@ mod tests {
 
         regex_seq
             .init(
+                rowids.iter(),
                 ids.iter(),
                 regexes.iter(),
                 sequences.iter(),
@@ -267,5 +288,30 @@ mod tests {
             .unwrap();
 
         assert!(matches!(id, Some(_)));
+    }
+
+    #[test]
+    fn test_get_id() {
+        let mut regex_seq = RegexSequence::new();
+
+        let rowids: Vec<u16> = vec![0, 1];
+        let ids: Vec<u16> = vec![1, 2];
+        let regexes = vec![r"(regex)", r"\s(regex)"];
+        let sequences: Vec<u16> = vec![10, 20];
+        let word1s: Vec<u16> = vec![1, 1];
+        let word2s: Vec<u16> = vec![3, 2];
+
+        regex_seq
+            .init(
+                rowids.iter(),
+                ids.iter(),
+                regexes.iter(),
+                sequences.iter(),
+                word1s.iter(),
+                word2s.iter(),
+            )
+            .unwrap();
+
+        assert!(matches!(regex_seq.get_id(1), Some(id) if id == 2));
     }
 }
