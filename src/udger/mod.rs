@@ -7,7 +7,11 @@ use rusqlite::{params, Connection};
 
 use crate::ffi::UaInfo;
 
+mod regex_sequence;
+mod sql;
 mod word_detector;
+
+use self::regex_sequence::{RegexSequence, RegexSequenceScratch};
 use self::word_detector::{WordDetector, WordDetectorScratch};
 
 pub struct UdgerData {
@@ -26,6 +30,12 @@ pub struct Udger {
     client_words_detector: WordDetector,
     device_class_words_detector: WordDetector,
     os_words_detector: WordDetector,
+
+    application_regexes: RegexSequence,
+    client_regexes: RegexSequence,
+    device_class_regexes: RegexSequence,
+    device_name_regexes: RegexSequence,
+    os_regexes: RegexSequence,
 }
 
 impl Udger {
@@ -64,6 +74,43 @@ impl Udger {
             &conn,
         )?;
 
+        Udger::init_regex_sequence(
+            &mut self.application_regexes,
+            &String::from("udger_application_regex"),
+            &String::from("application_id"),
+            &conn,
+        )?;
+
+        Udger::init_regex_sequence(
+            &mut self.client_regexes,
+            &String::from("udger_client_regex"),
+            &String::from("client_id"),
+            &conn,
+        )?;
+
+        Udger::init_regex_sequence(
+            &mut self.device_class_regexes,
+            &String::from("udger_deviceclass_regex"),
+            &String::from("deviceclass_id"),
+            &conn,
+        )?;
+
+        Udger::init_regex_sequence(
+            &mut self.device_name_regexes,
+            &String::from("udger_devicename_regex"),
+            &String::from("id"),
+            &conn,
+        )?;
+
+        Udger::init_regex_sequence(
+            &mut self.os_regexes,
+            &String::from("udger_os_regex"),
+            &String::from("os_id"),
+            &conn,
+        )?;
+
+        self.conn = Some(conn);
+
         Ok(())
     }
 
@@ -89,6 +136,59 @@ impl Udger {
             .collect();
 
         detector.init(Patterns::from(words))?;
+        Ok(())
+    }
+
+    fn init_regex_sequence(
+        seq: &mut RegexSequence,
+        table: &String,
+        id_column_name: &String,
+        conn: &Connection,
+    ) -> Result<()> {
+        let mut stmt = conn.prepare(
+            format!(
+                "SELECT rowid, {}, regstring, sequence, word_id, word2_id FROM {} ORDER BY sequence;",
+                id_column_name,
+                table
+            )
+            .as_str(),
+        )?;
+        let rows = stmt.query_map(params![], |row| {
+            let rowid: i32 = row.get(0)?;
+            let id: i32 = row.get(1)?;
+            let expression: String = row.get(2)?;
+            let expression: &str = expression.strip_prefix("/").unwrap();
+            let expression: &str = expression.strip_suffix("/si").unwrap();
+            let sequence: i32 = row.get(3)?;
+            let word1: i32 = row.get(4)?;
+            let word2: i32 = row.get(5)?;
+            Ok((rowid, id, expression.to_string(), sequence, word1, word2))
+        })?;
+
+        let mut rowids = Vec::new();
+        let mut ids = Vec::new();
+        let mut regexes: Vec<String> = Vec::new();
+        let mut sequences: Vec<u16> = Vec::new();
+        let mut word1s: Vec<u16> = Vec::new();
+        let mut word2s: Vec<u16> = Vec::new();
+        rows.for_each(|row| {
+            rowids.push(((&row).as_ref().unwrap().0) as u16);
+            ids.push(((&row).as_ref().unwrap().1) as u16);
+            regexes.push((&row).as_ref().unwrap().2.clone());
+            sequences.push((&row).as_ref().unwrap().3 as u16);
+            word1s.push((&row).as_ref().unwrap().4 as u16);
+            word2s.push((&row).as_ref().unwrap().5 as u16);
+        });
+
+        seq.init(
+            rowids.iter(),
+            ids.iter(),
+            regexes.iter(),
+            sequences.iter(),
+            word1s.iter(),
+            word2s.iter(),
+        )?;
+
         Ok(())
     }
 
@@ -146,7 +246,6 @@ impl Udger {
             let buf = ua.as_ref();
             let vec = Vec::from_raw_parts(buf.as_ptr() as *mut u8, buf.len(), buf.len());
             info.ua = String::from_utf8_lossy(&vec).to_owned().to_string();
-            // String::from_raw
         }
         self.detect_client(&ua, data, info)?;
         self.detect_os(&ua, data, info)?;
