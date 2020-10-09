@@ -48,6 +48,15 @@ impl Udger {
     pub fn new() -> Udger {
         let mut udger = Udger::default();
         udger.capacity = 10000;
+        udger.application_words_detector.name = String::from("application_words_detector");
+        udger.client_words_detector.name = String::from("client_words_detector");
+        udger.device_class_words_detector.name = String::from("device_class_words_detector");
+        udger.os_words_detector.name = String::from("os_words_detector");
+        udger.application_regexes.name = String::from("application_regexes");
+        udger.client_regexes.name = String::from("client_regexes");
+        udger.device_class_regexes.name = String::from("device_class_regexes");
+        udger.device_name_regexes.name = String::from("device_name_regexes");
+        udger.os_regexes.name = String::from("os_regexes");
         udger
     }
 
