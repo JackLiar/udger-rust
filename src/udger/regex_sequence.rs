@@ -99,7 +99,7 @@ impl RegexSequence {
         }
     }
 
-    pub fn get_word_id<'a, T, I>(
+    pub fn get_row_id<'a, T, I>(
         &self,
         ua: T,
         scratch: &mut RegexSequenceScratch,
@@ -169,7 +169,8 @@ impl RegexSequence {
         Ok(None)
     }
 
-    pub fn get_id(self, row_id: u16) -> Option<u16> {
+    /// Get actual id by row number
+    pub fn get_id(&self, row_id: u16) -> Option<u16> {
         match self.rowid_id_map.get(&row_id) {
             None => None,
             Some(id) => Some(*id),
@@ -207,7 +208,7 @@ mod tests {
 
         let word_ids: Vec<u16> = vec![1, 2, 3];
         let id = regex_seq
-            .get_word_id(
+            .get_row_id(
                 "This is a sentence contains the word regex",
                 &mut scratch,
                 word_ids.iter(),
@@ -244,7 +245,7 @@ mod tests {
 
         let word_ids: Vec<u16> = vec![1, 2, 3];
         let id = regex_seq
-            .get_word_id(
+            .get_row_id(
                 "This is a sentence contains the word regex",
                 &mut scratch,
                 word_ids.iter(),
@@ -280,7 +281,7 @@ mod tests {
 
         let word_ids: Vec<u16> = vec![1, 2, 3];
         let id = regex_seq
-            .get_word_id(
+            .get_row_id(
                 "This is a sentence contains the word regex",
                 &mut scratch,
                 word_ids.iter(),

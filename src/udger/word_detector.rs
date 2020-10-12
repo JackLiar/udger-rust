@@ -51,7 +51,7 @@ impl WordDetector {
     /// Match words table
     ///
     /// If User-Agent match any word, return all the matched words' ids.
-    pub fn get_word_ids<T>(&self, ua: T, scratch: &mut WordDetectorScratch) -> Result<Vec<WordID>>
+    pub fn get_word_ids<T>(&self, ua: &T, scratch: &mut WordDetectorScratch) -> Result<Vec<WordID>>
     where
         T: AsRef<[u8]>,
     {
