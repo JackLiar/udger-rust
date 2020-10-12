@@ -69,6 +69,7 @@ impl Udger {
     }
 
     pub fn init(&mut self, db_path: PathBuf, capacity: u16) -> Result<()> {
+        println!("Initializing Udger");
         self.capacity = capacity;
 
         let conn = Connection::open(db_path)?;
@@ -142,6 +143,7 @@ impl Udger {
         )?;
 
         self.conn = Some(conn);
+        println!("Finish initializing Udger");
 
         Ok(())
     }
@@ -335,12 +337,41 @@ impl Udger {
             Some(conn) => conn.prepare(sql::SQL_CRAWLER)?,
         };
 
-        // If no rows are returned, continue detection
+        // If any rows are returned, is classified as crawler
         // If error is not QueryReturnedNoRows, return the original error
         // Otherwise continue
-        match stmt.query_row(params![ua.as_ref()], |_row| {
+        match stmt.query_row(params![ua.as_ref()], |row| {
             info.class_id = 99;
             info.client_id = -1;
+            info.ua_class = row.get(2)?;
+            info.ua_class_code = row.get(3)?;
+            info.ua = row.get(4)?;
+            info.ua_engine = row.get(5)?;
+            info.ua_version = row.get(6)?;
+            info.ua_version_major = row.get(7)?;
+            info.crawler_last_seen = row.get(8)?;
+            info.crawler_respect_robotstxt = row.get(9)?;
+            info.crawler_category = row.get(10)?;
+            info.crawler_category_code = row.get(11)?;
+            info.ua_uptodate_current_version = row.get(12)?;
+            info.ua_family = row.get(13)?;
+            info.ua_family_code = row.get(14)?;
+            #[cfg(homepage)]
+            {
+                info.ua_family_homepage = row.get(15)?;
+                info.ua_family_vendor_code_homepage = row.get(20)?;
+            }
+            #[cfg(icon)]
+            {
+                info.ua_family_icon = row.get(16)?;
+                info.ua_family_icon_big = row.get(17)?;
+            }
+            info.ua_family_vendor = row.get(18)?;
+            info.ua_family_vendor_code = row.get(19)?;
+            #[cfg(url)]
+            {
+                info.ua_family_info_url = row.get(21)?;
+            }
             Ok(())
         }) {
             Err(err) => {
@@ -390,7 +421,6 @@ impl Udger {
             }
             Ok(_) => {}
         };
-        println!("{:?}", info);
 
         Ok(())
     }
@@ -463,7 +493,13 @@ mod tests {
         udger.detect_client(&ua, &mut data, &mut info).unwrap();
 
         assert_eq!(info.ua_class, "Browser");
-        assert_eq!(info.ua_class, "Browser");
         assert_eq!(info.ua_class_code, "browser");
+
+        let ua = String::from("Googlebot/2.1 (+http://www.google.com/bot.html)");
+        udger.detect_client(&ua, &mut data, &mut info).unwrap();
+        assert_eq!(info.crawler_category, "Search engine bot");
+        assert_eq!(info.crawler_category_code, "search_engine_bot");
+        assert_eq!(info.crawler_last_seen, "2017-05-07 08:16:09");
+        assert_eq!(info.crawler_respect_robotstxt, "yes");
     }
 }
