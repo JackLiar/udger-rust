@@ -1,0 +1,27 @@
+#! /bin/bash
+export PKG_CONFIG_PATH=$(pwd)/build/install/lib/pkgconfig:$(pwd)/build/install/lib64/pkgconfig
+export LD_LIBRARY_PATH=$(pwd)/build/install/lib
+
+export CARGO_INCREMENTAL=0
+export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests -Cpanic=abort"
+export RUSTDOCFLAGS="-Cpanic=abort"
+
+rustup default nightly
+
+rm -rf ./target/debug/coverage
+cargo test --features icon --features homepage --features url -- --nocapture
+# grcov ./target/debug/ -s . -t html --llvm --branch --ignore-not-existing -o ./target/debug/coverage/ --excl-start 'mod tests'
+grcov ./target/debug/deps/ -s . \
+    -t lcov --llvm --branch --ignore-not-existing \
+    -o ./target/debug/lcov.info \
+    --excl-start '^#\[cfg\(test\)\]$' \
+    --excl-stop '^}$'
+genhtml -q -o ./target/debug/coverage --show-details --highlight --ignore-errors source --legend ./target/debug/lcov.info
+# find target -name "*.gcno" | xargs rm
+find target -name "*.gcda" | xargs rm
+
+unset CARGO_INCREMENTAL
+unset RUSTFLAGS
+unset RUSTDOCFLAGS
+
+rustup default stable
