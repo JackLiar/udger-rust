@@ -4,10 +4,12 @@ use libc::size_t;
 use serde::{Deserialize, Serialize};
 
 #[repr(C)]
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct UaInfo {
+    #[serde(skip_serializing)]
     pub class_id: u8,
-    pub client_id: u16,
+    #[serde(skip_serializing)]
+    pub client_id: i16,
 
     pub ua_class: String,
     pub ua_class_code: String,
@@ -87,7 +89,7 @@ unsafe extern "C" fn ua_info_get_class_id(info: *const UaInfo) -> u8 {
 }
 
 #[no_mangle]
-unsafe extern "C" fn ua_info_get_client_id(info: *const UaInfo) -> u16 {
+unsafe extern "C" fn ua_info_get_client_id(info: *const UaInfo) -> i16 {
     (*info).client_id
 }
 
@@ -645,6 +647,6 @@ mod tests {
             // println!("output string: {}", output_string);
         }
 
-        assert_eq!(output_string, "{\"class_id\":0,\"client_id\":0,\"ua_class\":\"\",\"ua_class_code\":\"\",\"ua\":\"wget/1.20.3\",\"ua_engine\":\"\",\"ua_version\":\"\",\"ua_version_major\":\"\",\"ua_version_minor\":\"\",\"crawler_last_seen\":\"\",\"crawler_respect_robotstxt\":\"\",\"crawler_category\":\"\",\"crawler_category_code\":\"\",\"ua_uptodate_current_version\":\"\",\"ua_family\":\"\",\"ua_family_code\":\"\",\"ua_family_vendor\":\"\",\"ua_family_vendor_code\":\"\",\"ua_string\":\"\",\"os_family\":\"\",\"os_family_code\":\"\",\"os\":\"\",\"os_code\":\"\",\"os_family_vendor\":\"\",\"os_family_vendor_code\":\"\",\"device_class\":\"\",\"device_class_code\":\"\",\"device_marketname\":\"\",\"device_brand\":\"\",\"device_brand_code\":\"\",\"application_name\":\"\",\"application_version\":\"\"}");
+        assert_eq!(output_string, "{\"ua_class\":\"\",\"ua_class_code\":\"\",\"ua\":\"wget/1.20.3\",\"ua_engine\":\"\",\"ua_version\":\"\",\"ua_version_major\":\"\",\"ua_version_minor\":\"\",\"crawler_last_seen\":\"\",\"crawler_respect_robotstxt\":\"\",\"crawler_category\":\"\",\"crawler_category_code\":\"\",\"ua_uptodate_current_version\":\"\",\"ua_family\":\"\",\"ua_family_code\":\"\",\"ua_family_vendor\":\"\",\"ua_family_vendor_code\":\"\",\"ua_string\":\"\",\"os_family\":\"\",\"os_family_code\":\"\",\"os\":\"\",\"os_code\":\"\",\"os_family_vendor\":\"\",\"os_family_vendor_code\":\"\",\"device_class\":\"\",\"device_class_code\":\"\",\"device_marketname\":\"\",\"device_brand\":\"\",\"device_brand_code\":\"\",\"application_name\":\"\",\"application_version\":\"\"}");
     }
 }
