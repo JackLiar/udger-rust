@@ -452,12 +452,66 @@ impl Udger {
         Ok(())
     }
 
-    fn detect_os<T>(&self, ua: &T, data: &mut UdgerData, _info: &mut UaInfo) -> Result<()>
+    fn detect_os<T>(&self, ua: &T, data: &mut UdgerData, info: &mut UaInfo) -> Result<()>
     where
         T: AsRef<str>,
     {
-        self.os_words_detector
+        let word_ids = self
+            .os_words_detector
             .get_word_ids(&ua.as_ref(), &mut data.os_word_scratch)?;
+
+        if word_ids.len() == 0 {
+            if info.client_id <= 0 {
+                todo!("handle client_id equals to zero or less than zero");
+            }
+            todo!("handle os not matching condition");
+        }
+
+        let row_id = match self.os_regexes.get_row_id(
+            &ua.as_ref(),
+            &mut data.os_regex_scratch,
+            word_ids.iter(),
+        )? {
+            None => return Ok(()),
+            Some(rid) => rid,
+        };
+
+        let mut stmt = match &self.conn {
+            None => return Err(anyhow!(format!("Udger sqlite Connection is None"))),
+            Some(conn) => conn.prepare(&sql::SQL_OS)?,
+        };
+        match stmt.query_row(params![row_id], |row| {
+            info.os_family = row.get(1)?;
+            info.os_family_code = row.get(2)?;
+            info.os = row.get(3)?;
+            info.os_code = row.get(4)?;
+            #[cfg(homepage)]
+            {
+                info.os_homepage = row.get(5)?;
+                info.os_family_vendor_homepage = row.get(10)?;
+            }
+            #[cfg(icon)]
+            {
+                info.os_icon = row.get(6)?;
+                info.os_icon_big = row.get(7)?;
+            }
+            info.os_family_vendor = row.get(8)?;
+            info.os_family_vendor_code = row.get(9)?;
+            #[cfg(url)]
+            {
+                info.os_info_url = row.get(11)?;
+            }
+            Ok(())
+        }) {
+            Err(err) => {
+                match err {
+                    Error::QueryReturnedNoRows => {}
+                    _ => return Err(anyhow!(err)),
+                };
+            }
+            Ok(_) => {}
+        };
+
         Ok(())
     }
 
@@ -581,6 +635,48 @@ mod tests {
             assert_eq!(
                 info.ua_family_url,
                 "https://udger.com/resources/ua-list/bot-detail?bot=Googlebot#id4966"
+            );
+        }
+    }
+
+    #[test]
+    fn test_detect_os() {
+        let mut udger = Udger::new();
+        udger
+            .init(PathBuf::from("./data/udgerdb_v3_test.dat"), 10000)
+            .unwrap();
+
+        let mut data = udger.alloc_udger_data().unwrap();
+        let mut info = UaInfo::default();
+        let ua = String::from(
+            "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:40.0) Gecko/20100101 Firefox/40.0",
+        );
+        udger.detect_os(&ua, &mut data, &mut info).unwrap();
+
+        assert_eq!(info.os, "Windows 10");
+        assert_eq!(info.os_code, "windows_10");
+        assert_eq!(info.os_family, "Windows");
+        assert_eq!(info.os_family_code, "windows");
+        assert_eq!(info.os_family_vendor, "Microsoft Corporation.");
+        assert_eq!(info.os_family_vendor_code, "microsoft_corporation");
+        #[cfg(homepage)]
+        {
+            assert_eq!(
+                info.os_family_vendor_homepage,
+                "https://www.microsoft.com/about/"
+            );
+            assert_eq!(info.os_homepage, "https://en.wikipedia.org/wiki/Windows_10");
+        }
+        #[cfg(icon)]
+        {
+            assert_eq!(info.os_icon, "windows10.png");
+            assert_eq!(info.os_icon_big, "windows10_big.png");
+        }
+        #[cfg(icon)]
+        {
+            assert_eq!(
+                info.os_info_url,
+                "https://udger.com/resources/ua-list/os-detail?os=Windows%2010"
             );
         }
     }

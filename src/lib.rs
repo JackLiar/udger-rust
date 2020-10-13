@@ -1,5 +1,7 @@
 extern crate anyhow;
 extern crate hyperscan;
+#[macro_use]
+extern crate lazy_static;
 extern crate libc;
 extern crate rusqlite;
 extern crate serde;
