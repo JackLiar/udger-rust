@@ -330,7 +330,7 @@ impl Udger {
 
     fn detect_client<T>(&self, ua: &T, data: &mut UdgerData, info: &mut UaInfo) -> Result<()>
     where
-        T: AsRef<[u8]>,
+        T: AsRef<str>,
     {
         let mut stmt = match &self.conn {
             None => return Err(anyhow!(format!("Udger sqlite Connection is None"))),
@@ -346,14 +346,14 @@ impl Udger {
             info.ua_class = row.get(2)?;
             info.ua_class_code = row.get(3)?;
             info.ua = row.get(4)?;
-            info.ua_engine = row.get(5)?;
+            info.ua_engine = row.get(5).unwrap_or_default();
             info.ua_version = row.get(6)?;
             info.ua_version_major = row.get(7)?;
             info.crawler_last_seen = row.get(8)?;
             info.crawler_respect_robotstxt = row.get(9)?;
             info.crawler_category = row.get(10)?;
             info.crawler_category_code = row.get(11)?;
-            info.ua_uptodate_current_version = row.get(12)?;
+            info.ua_uptodate_current_version = row.get(12).unwrap_or_default();
             info.ua_family = row.get(13)?;
             info.ua_family_code = row.get(14)?;
             #[cfg(homepage)]
@@ -385,7 +385,7 @@ impl Udger {
 
         let word_ids = self
             .client_words_detector
-            .get_word_ids(&ua, &mut data.client_word_scratch)?;
+            .get_word_ids(&ua.as_ref(), &mut data.client_word_scratch)?;
 
         if word_ids.len() == 0 {
             info.ua_class = String::from(UNRECOGNIZED);
@@ -394,7 +394,7 @@ impl Udger {
         }
 
         let row_id = match self.client_regexes.get_row_id(
-            &ua,
+            &ua.as_ref(),
             &mut data.client_regex_scratch,
             word_ids.iter(),
         )? {
@@ -427,38 +427,38 @@ impl Udger {
 
     fn detect_os<T>(&self, ua: &T, data: &mut UdgerData, _info: &mut UaInfo) -> Result<()>
     where
-        T: AsRef<[u8]>,
+        T: AsRef<str>,
     {
         self.os_words_detector
-            .get_word_ids(&ua, &mut data.os_word_scratch)?;
+            .get_word_ids(&ua.as_ref(), &mut data.os_word_scratch)?;
         Ok(())
     }
 
     fn detect_device<T>(&self, ua: &T, data: &mut UdgerData, _info: &mut UaInfo) -> Result<()>
     where
-        T: AsRef<[u8]>,
+        T: AsRef<str>,
     {
         self.device_class_words_detector
-            .get_word_ids(&ua, &mut data.device_word_scratch)?;
+            .get_word_ids(&ua.as_ref(), &mut data.device_word_scratch)?;
         Ok(())
     }
 
     fn detect_application<T>(&self, ua: &T, data: &mut UdgerData, _info: &mut UaInfo) -> Result<()>
     where
-        T: AsRef<[u8]>,
+        T: AsRef<str>,
     {
         self.application_words_detector
-            .get_word_ids(&ua, &mut data.app_word_scratch)?;
+            .get_word_ids(&ua.as_ref(), &mut data.app_word_scratch)?;
         Ok(())
     }
 
     pub fn parse_ua<T>(&self, ua: T, data: &mut UdgerData, info: &mut UaInfo) -> Result<()>
     where
-        T: AsRef<[u8]>,
+        T: AsRef<str>,
     {
         unsafe {
             // We need to find a better way/strategy to handle un-utf8 input
-            let buf = ua.as_ref();
+            let buf: &str = ua.as_ref();
             let vec = Vec::from_raw_parts(buf.as_ptr() as *mut u8, buf.len(), buf.len());
             info.ua = String::from_utf8_lossy(&vec).to_owned().to_string();
         }
@@ -482,7 +482,7 @@ mod tests {
     fn test_detect_client() {
         let mut udger = Udger::new();
         udger
-            .init(PathBuf::from("./data/udgerdb_v3.dat"), 10000)
+            .init(PathBuf::from("./data/udgerdb_v3_test.dat"), 10000)
             .unwrap();
 
         let mut data = udger.alloc_udger_data().unwrap();
@@ -499,7 +499,7 @@ mod tests {
         udger.detect_client(&ua, &mut data, &mut info).unwrap();
         assert_eq!(info.crawler_category, "Search engine bot");
         assert_eq!(info.crawler_category_code, "search_engine_bot");
-        assert_eq!(info.crawler_last_seen, "2017-05-07 08:16:09");
+        assert_eq!(info.crawler_last_seen, "2017-01-06 08:57:43");
         assert_eq!(info.crawler_respect_robotstxt, "yes");
     }
 }
