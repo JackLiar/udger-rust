@@ -160,7 +160,7 @@ impl Udger {
                 let id: i32 = row.get(0)?;
                 Ok(Pattern {
                     expression,
-                    flags: PatternFlags::CASELESS,
+                    flags: PatternFlags::CASELESS | PatternFlags::ALLOWEMPTY,
                     id: Some(id as usize),
                     ext: ExprExt::default(),
                     som: None,
