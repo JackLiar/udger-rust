@@ -411,6 +411,33 @@ impl Udger {
             info.class_id = row.get(2)?;
             info.ua_class = row.get(3)?;
             info.ua_class_code = row.get(4)?;
+            info.ua = row.get(5)?;
+            info.ua_engine = row.get(6)?;
+            info.ua_version = row.get(7).unwrap_or_default();
+            info.ua_version_major = row.get(8).unwrap_or_default();
+            info.crawler_last_seen = row.get(9).unwrap_or_default();
+            info.crawler_respect_robotstxt = row.get(10).unwrap_or_default();
+            info.crawler_category = row.get(11).unwrap_or_default();
+            info.crawler_category_code = row.get(12).unwrap_or_default();
+            info.ua_uptodate_current_version = row.get(13)?;
+            info.ua_family = row.get(14)?;
+            info.ua_family_code = row.get(15)?;
+            #[cfg(homepage)]
+            {
+                info.ua_family_code_homepage = row.get(16)?;
+            }
+            #[cfg(icon)]
+            {
+                info.ua_family_code_icon = row.get(17)?;
+                info.ua_family_code_icon_big = row.get(18)?;
+                info.ua_family_vendor_homepage = row.get(21)?;
+            }
+            info.ua_family_vendor = row.get(19)?;
+            info.ua_family_vendor_code = row.get(20)?;
+            #[cfg(url)]
+            {
+                info.ua_family_info_url = row.get(22)?;
+            }
             Ok(())
         }) {
             Err(err) => {
@@ -492,8 +519,34 @@ mod tests {
         );
         udger.detect_client(&ua, &mut data, &mut info).unwrap();
 
+        assert_eq!(info.ua, "Firefox");
         assert_eq!(info.ua_class, "Browser");
         assert_eq!(info.ua_class_code, "browser");
+        assert_eq!(info.ua_engine, "Gecko");
+        // assert_eq!(info.ua_version, "40.0");
+        // assert_eq!(info.ua_version_major, "40");
+        assert_eq!(info.ua_uptodate_current_version, "50");
+        assert_eq!(info.ua_family, "Firefox");
+        assert_eq!(info.ua_family_code, "firefox");
+        #[cfg(homepage)]
+        {
+            assert_eq!(info.ua_family_homepage, "http://www.firefox.com/");
+            assert_eq!(info.ua_family_vendor_homepage, "http://www.mozilla.org/");
+        }
+        #[cfg(icon)]
+        {
+            assert_eq!(info.ua_family_icon, "firefox.png");
+            assert_eq!(info.ua_family_icon_big, "firefox_big.png");
+        }
+        #[cfg(url)]
+        {
+            assert_eq!(
+                info.ua_family_info_url,
+                "https://udger.com/resources/ua-list/browser-detail?browser=Firefox"
+            );
+        }
+        assert_eq!(info.ua_family_vendor, "Mozilla Foundation");
+        assert_eq!(info.ua_family_vendor_code, "mozilla_foundation");
 
         let ua = String::from("Googlebot/2.1 (+http://www.google.com/bot.html)");
         udger.detect_client(&ua, &mut data, &mut info).unwrap();
