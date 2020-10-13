@@ -501,5 +501,34 @@ mod tests {
         assert_eq!(info.crawler_category_code, "search_engine_bot");
         assert_eq!(info.crawler_last_seen, "2017-01-06 08:57:43");
         assert_eq!(info.crawler_respect_robotstxt, "yes");
+        assert_eq!(info.ua, "Googlebot/2.1");
+        assert_eq!(info.ua_class, "Crawler");
+        assert_eq!(info.ua_class_code, "crawler");
+        assert_eq!(info.ua_family, "Googlebot");
+        assert_eq!(info.ua_family_code, "googlebot");
+        assert_eq!(info.ua_family_vendor, "Google Inc.");
+        assert_eq!(info.ua_family_vendor_code, "google_inc");
+        assert_eq!(info.ua_version, "2.1");
+        assert_eq!(info.ua_version_major, "2");
+        #[cfg(homepage)]
+        {
+            assert_eq!(info.ua_family_homepage, "http://www.google.com/bot.html");
+            assert_eq!(
+                info.ua_family_vendor_homepage,
+                "https://www.google.com/about/company/"
+            );
+        }
+        #[cfg(icon)]
+        {
+            assert_eq!(info.ua_family_icon, "bot_googlebot.png");
+            assert_eq!(info.ua_family_icon_big, "");
+        }
+        #[cfg(icon)]
+        {
+            assert_eq!(
+                info.ua_family_url,
+                "https://udger.com/resources/ua-list/bot-detail?bot=Googlebot#id4966"
+            );
+        }
     }
 }
