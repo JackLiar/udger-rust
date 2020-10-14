@@ -380,25 +380,23 @@ impl Udger {
                     _ => return Err(anyhow!(err)),
                 };
             }
-            Ok(_) => {}
+            Ok(_) => return Ok(()),
         };
 
         let word_ids = self
             .client_words_detector
             .get_word_ids(&ua.as_ref(), &mut data.client_word_scratch)?;
 
-        if word_ids.len() == 0 {
-            info.ua_class = String::from(UNRECOGNIZED);
-            info.ua_class_code = String::from(UNRECOGNIZED);
-            return Ok(());
-        }
-
         let row_id = match self.client_regexes.get_row_id(
             &ua.as_ref(),
             &mut data.client_regex_scratch,
-            word_ids.iter(),
+            &word_ids.iter(),
         )? {
-            None => return Ok(()),
+            None => {
+                info.ua_class = String::from(UNRECOGNIZED);
+                info.ua_class_code = String::from(UNRECOGNIZED);
+                return Ok(());
+            }
             Some(rid) => rid,
         };
 
@@ -460,17 +458,10 @@ impl Udger {
             .os_words_detector
             .get_word_ids(&ua.as_ref(), &mut data.os_word_scratch)?;
 
-        if word_ids.len() == 0 {
-            if info.client_id <= 0 {
-                todo!("handle client_id equals to zero or less than zero");
-            }
-            todo!("handle os not matching condition");
-        }
-
         let row_id = match self.os_regexes.get_row_id(
             &ua.as_ref(),
             &mut data.os_regex_scratch,
-            word_ids.iter(),
+            &word_ids.iter(),
         )? {
             None => return Ok(()),
             Some(rid) => rid,

@@ -12,10 +12,7 @@ pub struct RegexSequenceScratch {
 
 impl RegexSequenceScratch {
     pub fn new(name: String, scratch: Scratch) -> RegexSequenceScratch {
-        RegexSequenceScratch {
-            name: name,
-            raw: scratch,
-        }
+        RegexSequenceScratch { name, raw: scratch }
     }
 
     pub fn raw(&mut self) -> &mut Scratch {
@@ -103,12 +100,16 @@ impl RegexSequence {
         &self,
         ua: T,
         scratch: &mut RegexSequenceScratch,
-        word_ids: I,
+        word_ids: &I,
     ) -> Result<Option<u16>>
     where
         T: AsRef<[u8]>,
         I: Iterator<Item = &'a u16> + Clone,
     {
+        if word_ids.clone().count() == 0 {
+            return Ok(None);
+        }
+
         let mut id_seqs = Vec::new();
 
         match &self.db {
@@ -211,7 +212,7 @@ mod tests {
             .get_row_id(
                 "This is a sentence contains the word regex",
                 &mut scratch,
-                word_ids.iter(),
+                &word_ids.iter(),
             )
             .unwrap();
 
@@ -248,7 +249,7 @@ mod tests {
             .get_row_id(
                 "This is a sentence contains the word regex",
                 &mut scratch,
-                word_ids.iter(),
+                &word_ids.iter(),
             )
             .unwrap();
 
@@ -284,7 +285,7 @@ mod tests {
             .get_row_id(
                 "This is a sentence contains the word regex",
                 &mut scratch,
-                word_ids.iter(),
+                &word_ids.iter(),
             )
             .unwrap();
 
