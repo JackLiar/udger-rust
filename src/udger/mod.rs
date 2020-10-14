@@ -18,11 +18,13 @@ use self::word_detector::{WordDetector, WordDetectorScratch};
 const UNRECOGNIZED: &str = "unrecognized";
 
 pub struct UdgerData {
+    #[cfg(application)]
     pub app_word_scratch: WordDetectorScratch,
     pub client_word_scratch: WordDetectorScratch,
     pub device_word_scratch: WordDetectorScratch,
     pub os_word_scratch: WordDetectorScratch,
 
+    #[cfg(application)]
     pub app_regex_scratch: RegexSequenceScratch,
     pub client_regex_scratch: RegexSequenceScratch,
     pub device_class_regex_scratch: RegexSequenceScratch,
@@ -35,11 +37,13 @@ pub struct Udger {
     capacity: u16,
     conn: Option<Connection>,
 
+    #[cfg(application)]
     application_words_detector: WordDetector,
     client_words_detector: WordDetector,
     device_class_words_detector: WordDetector,
     os_words_detector: WordDetector,
 
+    #[cfg(application)]
     application_regexes: RegexSequence,
     client_regexes: RegexSequence,
     device_class_regexes: RegexSequence,
@@ -56,15 +60,18 @@ impl Udger {
     pub fn new() -> Udger {
         let mut udger = Udger::default();
         udger.capacity = 10000;
-        udger.application_words_detector.name = String::from("application_words_detector");
         udger.client_words_detector.name = String::from("client_words_detector");
         udger.device_class_words_detector.name = String::from("device_class_words_detector");
         udger.os_words_detector.name = String::from("os_words_detector");
-        udger.application_regexes.name = String::from("application_regexes");
         udger.client_regexes.name = String::from("client_regexes");
         udger.device_class_regexes.name = String::from("device_class_regexes");
         udger.device_name_regexes.name = String::from("device_name_regexes");
         udger.os_regexes.name = String::from("os_regexes");
+        #[cfg(application)]
+        {
+            udger.application_words_detector.name = String::from("application_words_detector");
+            udger.application_regexes.name = String::from("application_regexes");
+        }
         udger
     }
 
@@ -74,11 +81,14 @@ impl Udger {
 
         let conn = Connection::open(db_path)?;
 
-        Udger::init_word_detector(
-            &mut self.application_words_detector,
-            &String::from("udger_application_regex_words"),
-            &conn,
-        )?;
+        #[cfg(application)]
+        {
+            Udger::init_word_detector(
+                &mut self.application_words_detector,
+                &String::from("udger_application_regex_words"),
+                &conn,
+            )?;
+        }
 
         Udger::init_word_detector(
             &mut self.client_words_detector,
@@ -98,14 +108,17 @@ impl Udger {
             &conn,
         )?;
 
-        Udger::init_regex_sequence(
-            &mut self.application_regexes,
-            &String::from("udger_application_regex"),
-            &String::from("application_id"),
-            &String::from("word_id"),
-            &String::from("word2_id"),
-            &conn,
-        )?;
+        #[cfg(application)]
+        {
+            Udger::init_regex_sequence(
+                &mut self.application_regexes,
+                &String::from("udger_application_regex"),
+                &String::from("application_id"),
+                &String::from("word_id"),
+                &String::from("word2_id"),
+                &conn,
+            )?;
+        }
 
         Udger::init_regex_sequence(
             &mut self.client_regexes,
@@ -316,10 +329,12 @@ impl Udger {
 
     pub fn alloc_udger_data(&self) -> Result<UdgerData> {
         Ok(UdgerData {
+            #[cfg(application)]
             app_word_scratch: self.application_words_detector.alloc_scratch()?,
             client_word_scratch: self.client_words_detector.alloc_scratch()?,
             device_word_scratch: self.device_class_words_detector.alloc_scratch()?,
             os_word_scratch: self.os_words_detector.alloc_scratch()?,
+            #[cfg(application)]
             app_regex_scratch: self.application_regexes.alloc_scratch()?,
             client_regex_scratch: self.client_regexes.alloc_scratch()?,
             device_class_regex_scratch: self.device_class_regexes.alloc_scratch()?,
@@ -605,7 +620,10 @@ impl Udger {
         }
         self.detect_client(&ua, data, info)?;
         self.detect_os(&ua, data, info)?;
-        self.detect_application(&ua, data, info)?;
+        #[cfg(application)]
+        {
+            self.detect_application(&ua, data, info)?;
+        }
         self.detect_device(&ua, data, info)?;
 
         Ok(())
