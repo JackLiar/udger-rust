@@ -599,6 +599,7 @@ impl Udger {
         Ok(())
     }
 
+    #[cfg(application)]
     fn detect_application<T>(&self, ua: &T, data: &mut UdgerData, _info: &mut UaInfo) -> Result<()>
     where
         T: AsRef<str>,
