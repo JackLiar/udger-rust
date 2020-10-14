@@ -506,12 +506,81 @@ impl Udger {
         Ok(())
     }
 
-    fn detect_device<T>(&self, ua: &T, data: &mut UdgerData, _info: &mut UaInfo) -> Result<()>
+    fn detect_device<T>(&self, ua: &T, data: &mut UdgerData, info: &mut UaInfo) -> Result<()>
     where
         T: AsRef<str>,
     {
-        self.device_class_words_detector
+        let word_ids = self
+            .device_class_words_detector
             .get_word_ids(&ua.as_ref(), &mut data.device_word_scratch)?;
+
+        let row_id = match self.device_class_regexes.get_row_id(
+            &ua.as_ref(),
+            &mut data.os_regex_scratch,
+            &word_ids.iter(),
+        )? {
+            None => {
+                if info.class_id != -1 {
+                    let mut stmt = match &self.conn {
+                        None => return Err(anyhow!(format!("Udger sqlite Connection is None"))),
+                        Some(conn) => conn.prepare(&sql::SQL_CLIENT_CLASS)?,
+                    };
+                    let class_id = info.class_id;
+                    match stmt.query_row(params![class_id], |row| {
+                        info.device_class = row.get(0)?;
+                        info.device_class_code = row.get(1)?;
+                        #[cfg(icon)]
+                        {
+                            info.device_class_icon = row.get(2)?;
+                            info.device_class_icon_big = row.get(3)?;
+                        }
+                        #[cfg(url)]
+                        {
+                            info.device_class_info_url = row.get(4)?;
+                        }
+                        Ok(())
+                    }) {
+                        Err(err) => {
+                            match err {
+                                Error::QueryReturnedNoRows => {}
+                                _ => return Err(anyhow!(err)),
+                            };
+                        }
+                        Ok(_) => {}
+                    };
+                }
+                return Ok(());
+            }
+            Some(rid) => rid,
+        };
+
+        let mut stmt = match &self.conn {
+            None => return Err(anyhow!(format!("Udger sqlite Connection is None"))),
+            Some(conn) => conn.prepare(&sql::SQL_DEVICE)?,
+        };
+        match stmt.query_row(params![row_id], |row| {
+            info.device_class = row.get(0)?;
+            info.device_class_code = row.get(1)?;
+            #[cfg(icon)]
+            {
+                info.device_class_icon = row.get(2)?;
+                info.device_class_icon_big = row.get(3)?;
+            }
+            #[cfg(url)]
+            {
+                info.device_class_info_url = row.get(4)?;
+            }
+            Ok(())
+        }) {
+            Err(err) => {
+                match err {
+                    Error::QueryReturnedNoRows => {}
+                    _ => return Err(anyhow!(err)),
+                };
+            }
+            Ok(_) => {}
+        };
+
         Ok(())
     }
 
@@ -564,6 +633,8 @@ mod tests {
         );
         udger.detect_client(&ua, &mut data, &mut info).unwrap();
 
+        assert_eq!(info.client_id, 3);
+        assert_eq!(info.class_id, 0);
         assert_eq!(info.ua, "Firefox");
         assert_eq!(info.ua_class, "Browser");
         assert_eq!(info.ua_class_code, "browser");
@@ -668,6 +739,40 @@ mod tests {
             assert_eq!(
                 info.os_info_url,
                 "https://udger.com/resources/ua-list/os-detail?os=Windows%2010"
+            );
+        }
+    }
+
+    #[test]
+    fn test_detect_device() {
+        // some regular expressions in udgerdb_v3_test.data's udger_deviceclass_regex_words table
+        // could cause lots of incorrect matching,
+        // so use the real udger database to test this function
+        let mut udger = Udger::new();
+        udger
+            .init(PathBuf::from("./data/udgerdb_v3_full.dat"), 10000)
+            .unwrap();
+
+        let mut data = udger.alloc_udger_data().unwrap();
+        let mut info = UaInfo::default();
+        let ua = String::from(
+            "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:40.0) Gecko/20100101 Firefox/40.0",
+        );
+        udger.detect_client(&ua, &mut data, &mut info).unwrap();
+        udger.detect_device(&ua, &mut data, &mut info).unwrap();
+
+        assert_eq!(info.device_class, "Desktop");
+        assert_eq!(info.device_class_code, "desktop");
+        #[cfg(icon)]
+        {
+            assert_eq!(info.device_class_icon, "desktop.png");
+            assert_eq!(info.device_class_icon_big, "desktop_big.png");
+        }
+        #[cfg(url)]
+        {
+            assert_eq!(
+                info.device_class_info_url,
+                "https://udger.com/resources/ua-list/device-detail?device=Desktop"
             );
         }
     }

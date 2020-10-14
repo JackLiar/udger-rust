@@ -76,6 +76,13 @@ vendor_code AS os_family_vendor_code, \
 vendor_homepage AS os_family_vendor_homepage, \
 'https://udger.com/resources/ua-list/os-detail?os=' || REPLACE(name, ' ', '%20') AS os_info_url ";
 
+const DEVICE_COLUMNS: &str = 
+        "name AS device_class, \
+        name_code AS device_class_code, \
+        icon AS device_class_icon, \
+        icon_big AS device_class_icon_big, \
+        'https://udger.com/resources/ua-list/device-detail?device=' || REPLACE(name, ' ', '%20') AS device_class_info_url ";
+
 lazy_static! {
     pub static ref SQL_OS: String = format!(
         "{}{}{}{}{}{}{}{}{}",
@@ -99,5 +106,29 @@ lazy_static! {
         "udger_os_list ON udger_os_list.id = udger_client_os_relation.os_id ",
         "WHERE ",
         "client_id = ?"
+    );
+    pub static ref SQL_DEVICE: String = format!(
+        "{}{}{:?}{}{}{}{}{}{}",
+        "SELECT ",
+        "ur.rowid, ",
+        DEVICE_COLUMNS,
+        "FROM ",
+        "udger_deviceclass_regex ur ",
+        "JOIN ",
+        "udger_deviceclass_list ON udger_deviceclass_list.id = ur.deviceclass_id ",
+        "WHERE ",
+        "ur.rowid=?"
+    );
+    #[derive(Debug)]
+    pub static ref SQL_CLIENT_CLASS: String = format!(
+        "{}{}{}{}{}{}{}{}",
+        "SELECT ",
+        DEVICE_COLUMNS,
+        "FROM ",
+        "udger_deviceclass_list ",
+        "JOIN ",
+        "udger_client_class ON udger_client_class.deviceclass_id = udger_deviceclass_list.id ",
+        "WHERE ",
+        "udger_client_class.id = ?"
     );
 }

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct UaInfo {
     #[serde(skip_serializing)]
-    pub class_id: u8,
+    pub class_id: i8,
     #[serde(skip_serializing)]
     pub client_id: i16,
 
@@ -84,7 +84,7 @@ pub struct UaInfo {
 }
 
 #[no_mangle]
-unsafe extern "C" fn ua_info_get_class_id(info: *const UaInfo) -> u8 {
+unsafe extern "C" fn ua_info_get_class_id(info: *const UaInfo) -> i8 {
     (*info).class_id
 }
 
