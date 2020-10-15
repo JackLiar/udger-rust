@@ -166,23 +166,28 @@ impl Udger {
         table: &String,
         conn: &Connection,
     ) -> Result<()> {
-        let mut stmt = conn.prepare(format!("SELECT id, word FROM {}", table).as_str())?;
-        let words: Vec<Pattern> = stmt
-            .query_map(params![], |row| {
-                let expression: String = row.get(1)?;
-                let id: i32 = row.get(0)?;
-                Ok(Pattern {
-                    expression,
-                    flags: PatternFlags::CASELESS | PatternFlags::ALLOWEMPTY,
-                    id: Some(id as usize),
-                    ext: ExprExt::default(),
-                    som: None,
-                })
-            })?
-            .map(|e| e.unwrap())
-            .collect();
+        let mut stmt = conn.prepare(format!("SELECT id, word, count FROM {}", table).as_str())?;
+        let mut rows = stmt.query(params![])?;
+        let mut words = Vec::new();
+        let mut ids = Vec::new();
+        let mut counts = Vec::new();
+        while let Some(row) = rows.next()? {
+            let id: i32 = row.get(0)?;
+            let expression: String = row.get(1)?;
+            let count: i32 = row.get(2)?;
+            let pattern = Pattern {
+                expression,
+                flags: PatternFlags::CASELESS | PatternFlags::ALLOWEMPTY,
+                id: Some(id as usize),
+                ext: ExprExt::default(),
+                som: None,
+            };
+            words.push(pattern);
+            ids.push(id as u16);
+            counts.push(count as u16);
+        }
 
-        detector.init(Patterns::from(words))?;
+        detector.init(ids.iter(), Patterns::from(words), counts.iter())?;
         Ok(())
     }
 
@@ -775,23 +780,23 @@ mod tests {
         let mut data = udger.alloc_udger_data().unwrap();
         let mut info = UaInfo::default();
         let ua = String::from(
-            "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:40.0) Gecko/20100101 Firefox/40.0",
+            r"Mozilla\/5.0 (iPad; CPU OS 7_0 like Mac OS X) AppleWebKit\/537.51.1 (KHTML, like Gecko) Version\/7.0 Mobile\/11A465 Safari\/9537.53",
         );
         udger.detect_client(&ua, &mut data, &mut info).unwrap();
         udger.detect_device(&ua, &mut data, &mut info).unwrap();
 
-        assert_eq!(info.device_class, "Desktop");
-        assert_eq!(info.device_class_code, "desktop");
+        assert_eq!(info.device_class, "Tablet");
+        assert_eq!(info.device_class_code, "tablet");
         #[cfg(icon)]
         {
-            assert_eq!(info.device_class_icon, "desktop.png");
-            assert_eq!(info.device_class_icon_big, "desktop_big.png");
+            assert_eq!(info.device_class_icon, "tablet.png");
+            assert_eq!(info.device_class_icon_big, "tablet_big.png");
         }
         #[cfg(url)]
         {
             assert_eq!(
                 info.device_class_info_url,
-                "https://udger.com/resources/ua-list/device-detail?device=Desktop"
+                "https://udger.com/resources/ua-list/device-detail?device=Tablet"
             );
         }
     }
