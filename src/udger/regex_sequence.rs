@@ -44,7 +44,7 @@ pub trait RegexSequenceTrait: Default {
         }
     }
 
-    fn get_id_seqs<T>(&self, ua: &T, scratch: &mut RegexSequenceScratch) -> Result<Vec<(u16, u16)>>
+    fn get_ids<T>(&self, ua: &T, scratch: &mut RegexSequenceScratch) -> Result<Vec<u16>>
     where
         T: AsRef<[u8]>,
     {
@@ -82,7 +82,7 @@ pub trait RegexSequenceTrait: Default {
             }
         });
 
-        Ok(id_seqs)
+        Ok(id_seqs.iter().map(|(id, _)| *id).collect())
     }
 }
 
@@ -186,10 +186,10 @@ impl RegexSequence {
             return Ok(None);
         }
 
-        let id_seqs = self.get_id_seqs(ua, scratch)?;
+        let id_seqs = self.get_ids(ua, scratch)?;
 
         for item in &id_seqs {
-            let word_vec = match self.id_word_map.get(&item.0) {
+            let word_vec = match self.id_word_map.get(&item) {
                 None => continue,
                 Some(vec) => vec,
             };
@@ -202,11 +202,19 @@ impl RegexSequence {
                 }
             }
             if found_word_count == word_vec.len() {
-                return Ok(Some(item.0));
+                return Ok(Some(*item));
             }
         }
 
         Ok(None)
+    }
+
+    /// Get the actual id column of the sqlite table
+    pub fn get_id(&self, rowid: u16) -> Option<u16> {
+        match self.rowid_id_map.get(&rowid) {
+            None => None,
+            Some(id) => Some(*id),
+        }
     }
 }
 
@@ -290,10 +298,10 @@ impl DeviceBrandRegexSequence {
         T: AsRef<[u8]>,
         S: AsRef<str>,
     {
-        let id_seqs = self.get_id_seqs(ua, scratch)?;
+        let id_seqs = self.get_ids(ua, scratch)?;
 
         for item in &id_seqs {
-            let codes = match self.rowid_code_map.get(&item.0) {
+            let codes = match self.rowid_code_map.get(&item) {
                 None => continue,
                 Some(arr) => arr,
             };
@@ -301,7 +309,7 @@ impl DeviceBrandRegexSequence {
             if os_family_code.as_ref().to_string() == codes[0]
                 && os_code.as_ref().to_string() == codes[1]
             {
-                return match self.rowid_id_map.get(&item.0) {
+                return match self.rowid_id_map.get(&item) {
                     None => Ok(None),
                     Some(id) => Ok(Some(*id)),
                 };
