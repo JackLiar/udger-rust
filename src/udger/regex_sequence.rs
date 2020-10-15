@@ -73,9 +73,9 @@ pub trait RegexSequenceTrait: Default {
 
         // sort ids by sequence
         id_seqs.sort_by(|s, o| {
-            if s.1 < o.1 {
+            if s.1 > o.1 {
                 std::cmp::Ordering::Less
-            } else if s.1 > o.1 {
+            } else if s.1 < o.1 {
                 std::cmp::Ordering::Greater
             } else {
                 std::cmp::Ordering::Equal
@@ -186,10 +186,10 @@ impl RegexSequence {
             return Ok(None);
         }
 
-        let id_seqs = self.get_ids(ua, scratch)?;
+        let ids = self.get_ids(ua, scratch)?;
 
-        for item in &id_seqs {
-            let word_vec = match self.id_word_map.get(&item) {
+        for id in &ids {
+            let word_vec = match self.id_word_map.get(&id) {
                 None => continue,
                 Some(vec) => vec,
             };
@@ -202,7 +202,7 @@ impl RegexSequence {
                 }
             }
             if found_word_count == word_vec.len() {
-                return Ok(Some(*item));
+                return Ok(Some(*id));
             }
         }
 
