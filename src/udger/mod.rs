@@ -780,7 +780,7 @@ mod tests {
         let mut data = udger.alloc_udger_data().unwrap();
         let mut info = UaInfo::default();
         let ua = String::from(
-            r"Mozilla\/5.0 (iPad; CPU OS 7_0 like Mac OS X) AppleWebKit\/537.51.1 (KHTML, like Gecko) Version\/7.0 Mobile\/11A465 Safari\/9537.53",
+            "Mozilla/5.0 (iPad; CPU OS 7_0 like Mac OS X) AppleWebKit/537.51.1 (KHTML, like Gecko) Version/7.0 Mobile/11A465 Safari/9537.53",
         );
         udger.detect_client(&ua, &mut data, &mut info).unwrap();
         udger.detect_device(&ua, &mut data, &mut info).unwrap();
