@@ -579,16 +579,16 @@ impl Udger {
             Some(conn) => conn.prepare(&sql::SQL_DEVICE)?,
         };
         match stmt.query_row(params![row_id], |row| {
-            info.device_class = row.get(0)?;
-            info.device_class_code = row.get(1)?;
+            info.device_class = row.get(1)?;
+            info.device_class_code = row.get(2)?;
             #[cfg(icon)]
             {
-                info.device_class_icon = row.get(2)?;
-                info.device_class_icon_big = row.get(3)?;
+                info.device_class_icon = row.get(3)?;
+                info.device_class_icon_big = row.get(4)?;
             }
             #[cfg(url)]
             {
-                info.device_class_info_url = row.get(4)?;
+                info.device_class_info_url = row.get(5)?;
             }
             Ok(())
         }) {
