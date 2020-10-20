@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
@@ -51,8 +51,8 @@ pub struct Udger {
     device_name_regexes: RegexSequence,
     os_regexes: RegexSequence,
 
-    os_family_codes: Vec<String>,
-    os_codes: Vec<String>,
+    /// include all os_codes and os_family_codes
+    os_codes: HashMap<String, usize>,
     device_name_os_family_code_map: HashMap<u16, String>,
     device_name_os_code_map: HashMap<u16, String>,
 }
@@ -269,7 +269,6 @@ impl Udger {
         column2: &String,
         conn: &Connection,
     ) -> Result<()> {
-        let seq = &mut self.device_name_regexes;
         let mut stmt = conn.prepare(
             format!(
                 "SELECT rowid, {}, regstring, sequence, {}, {} FROM {} ORDER BY sequence;",
@@ -306,6 +305,9 @@ impl Udger {
         let mut ids = Vec::new();
         let mut regexes: Vec<String> = Vec::new();
         let mut sequences: Vec<u16> = Vec::new();
+        let mut os_family_codes = Vec::new();
+        let mut os_codes = Vec::new();
+        let mut code_set = HashSet::new();
         for (_i, row) in rows.enumerate() {
             let row = match row {
                 Err(err) => return Err(anyhow!(err)),
@@ -315,13 +317,27 @@ impl Udger {
             ids.push(row.1 as u16);
             regexes.push(row.2.clone());
             sequences.push(row.3 as u16);
-            self.os_family_codes.push(row.4.clone());
-            self.os_codes.push(row.5.clone());
+            os_family_codes.push(row.4.clone());
+            os_codes.push(row.5.clone());
+            // combine all the os_codes and os_family_codes
+            // !!! we asume there are no conflict between os_code and os_family_codes !!!
+            code_set.insert(row.4.clone());
+            code_set.insert(row.5.clone());
         }
+        // now convert all os_codes and os_family_codes to "word_id"
+        for (i, code) in code_set.iter().enumerate() {
+            self.os_codes.insert(code.clone(), i);
+        }
+        let range1 = os_family_codes
+            .iter()
+            .map(|code| *self.os_codes.get(code).unwrap() as u16)
+            .collect::<Vec<u16>>();
+        let range2 = os_codes
+            .iter()
+            .map(|code| *self.os_codes.get(code).unwrap() as u16)
+            .collect::<Vec<u16>>();
 
-        let range1 = (0..self.os_family_codes.len() as u16).collect::<Vec<u16>>();
-        let range2 = (0..self.os_codes.len() as u16).collect::<Vec<u16>>();
-        seq.init(
+        self.device_name_regexes.init(
             rowids.iter(),
             ids.iter(),
             regexes.iter(),
