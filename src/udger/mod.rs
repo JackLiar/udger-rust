@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Result};
 use hyperscan::prelude::{Pattern, Patterns};
 use hyperscan::{ExprExt, PatternFlags};
+use regex::Regex;
 use rusqlite::{params, Connection, Error};
 
 use crate::ffi::UaInfo;
@@ -206,6 +207,8 @@ impl Udger {
             )
             .as_str(),
         )?;
+        let prefix_regex = Regex::new(r"^/").unwrap();
+        let suffix_regex = Regex::new(r"/s?i?\s?$").unwrap();
         let rows = stmt.query_map(params![], |row| {
             let rowid: i32 = row.get(0)?;
             let id: i32 = row.get(1)?;
@@ -214,10 +217,8 @@ impl Udger {
                 None => expression.as_str(),
                 Some(expr) => expr,
             };
-            let expression = match expression.strip_suffix("/si") {
-                None => expression,
-                Some(expr) => expr,
-            };
+            let expression = prefix_regex.replace(expression, "");
+            let expression = suffix_regex.replace(expression.as_ref(), "");
             let sequence: i32 = row.get(3)?;
             let word1: i32 = row.get(4)?;
             let word2: i32 = row.get(5)?;
