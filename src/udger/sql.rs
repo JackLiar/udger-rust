@@ -108,7 +108,7 @@ lazy_static! {
         "client_id = ?"
     );
     pub static ref SQL_DEVICE: String = format!(
-        "{}{}{:?}{}{}{}{}{}{}",
+        "{}{}{}{}{}{}{}{}{}",
         "SELECT ",
         "ur.rowid, ",
         DEVICE_COLUMNS,
