@@ -53,8 +53,6 @@ pub struct Udger {
 
     /// include all os_codes and os_family_codes
     os_codes: HashMap<String, usize>,
-    device_name_os_family_code_map: HashMap<u16, String>,
-    device_name_os_code_map: HashMap<u16, String>,
 }
 
 impl Udger {
@@ -538,7 +536,7 @@ impl Udger {
 
         let row_id = match self.device_class_regexes.get_row_id(
             &ua.as_ref(),
-            &mut data.os_regex_scratch,
+            &mut data.device_class_regex_scratch,
             &word_ids.iter(),
         )? {
             None => {

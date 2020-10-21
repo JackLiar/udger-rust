@@ -38,10 +38,6 @@ impl RegexSequence {
         &self.db
     }
 
-    fn name(&self) -> &String {
-        &self.name
-    }
-
     fn rowid_sequence_map(&self) -> &HashMap<u16, u16> {
         &self.rowid_sequence_map
     }
