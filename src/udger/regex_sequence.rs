@@ -1,8 +1,8 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use hyperscan::chimera::prelude::*;
-use hyperscan::chimera::Flags;
 
 pub struct RegexSequenceScratch {
     /// Scratch name
@@ -133,11 +133,15 @@ impl RegexSequence {
             .zip(word1s)
             .zip(word2s);
         tup.for_each(|(((((rowid, id), regex), seq), word1), word2)| {
-            patterns.push(Pattern {
-                expression: String::from(regex.as_ref()),
-                flags: Flags::CASELESS,
-                id: Some(*rowid as usize),
-            });
+            let mut pattern = match Pattern::from_str(regex.as_ref()) {
+                Ok(ptrn) => ptrn,
+                Err(err) => {
+                    eprintln!("{:?}", err);
+                    return ();
+                }
+            };
+            pattern.id = Some(*rowid as usize);
+            patterns.push(pattern);
 
             // add new entry for <id, sequence> map
             self.rowid_sequence_map.insert(*rowid, *seq);
@@ -264,11 +268,15 @@ impl DeviceBrandRegexSequence {
             .zip(os_family_codes)
             .zip(os_codes);
         tup.for_each(|(((((rowid, id), regex), seq), os_family_code), os_code)| {
-            patterns.push(Pattern {
-                expression: String::from(regex.as_ref()),
-                flags: Flags::CASELESS,
-                id: Some(*rowid as usize),
-            });
+            let mut pattern = match Pattern::from_str(regex.as_ref()) {
+                Ok(ptrn) => ptrn,
+                Err(err) => {
+                    eprintln!("{:?}", err);
+                    return ();
+                }
+            };
+            pattern.id = Some(*rowid as usize);
+            patterns.push(pattern);
 
             // add new entry for <id, sequence> map
             self.rowid_sequence_map.insert(*rowid, *seq);

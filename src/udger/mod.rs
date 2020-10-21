@@ -207,22 +207,20 @@ impl Udger {
             )
             .as_str(),
         )?;
-        let prefix_regex = Regex::new(r"^/").unwrap();
-        let suffix_regex = Regex::new(r"/s?i?\s?$").unwrap();
+        let suffix_regex = Regex::new(r"\s?$").unwrap();
         let rows = stmt.query_map(params![], |row| {
             let rowid: i32 = row.get(0)?;
             let id: i32 = row.get(1)?;
             let expression: String = row.get(2)?;
-            let expression = match expression.strip_prefix("/") {
-                None => expression.as_str(),
-                Some(expr) => expr,
+            let expression = suffix_regex.replace(expression.as_ref(), "").to_string();
+            let expression = match expression.strip_suffix(" ") {
+                None => expression,
+                Some(expr) => expr.to_string(),
             };
-            let expression = prefix_regex.replace(expression, "");
-            let expression = suffix_regex.replace(expression.as_ref(), "");
             let sequence: i32 = row.get(3)?;
             let word1: i32 = row.get(4)?;
             let word2: i32 = row.get(5)?;
-            Ok((rowid, id, expression.to_string(), sequence, word1, word2))
+            Ok((rowid, id, expression, sequence, word1, word2))
         })?;
 
         let mut rowids = Vec::new();
@@ -276,29 +274,16 @@ impl Udger {
             )
             .as_str(),
         )?;
+        let suffix_regex = Regex::new(r"\s?$").unwrap();
         let rows = stmt.query_map(params![], |row| {
             let rowid: i32 = row.get(0)?;
             let id: i32 = row.get(1)?;
             let expression: String = row.get(2)?;
-            let expression = match expression.strip_prefix("/") {
-                None => expression.as_str(),
-                Some(expr) => expr,
-            };
-            let expression = match expression.strip_suffix("/si") {
-                None => expression,
-                Some(expr) => expr,
-            };
+            let expression = suffix_regex.replace(expression.as_ref(), "").to_string();
             let sequence: i32 = row.get(3)?;
             let os_family_code: String = row.get(4)?;
             let os_code: String = row.get(5)?;
-            Ok((
-                rowid,
-                id,
-                expression.to_string(),
-                sequence,
-                os_family_code,
-                os_code,
-            ))
+            Ok((rowid, id, expression, sequence, os_family_code, os_code))
         })?;
 
         let mut rowids = Vec::new();
