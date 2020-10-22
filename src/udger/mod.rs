@@ -685,7 +685,7 @@ impl Udger {
         Ok(())
     }
 
-    pub fn parse_ua<T>(&self, ua: T, data: &mut UdgerData, info: &mut UaInfo) -> Result<()>
+    pub fn parse_ua<T>(&self, ua: &T, data: &mut UdgerData, info: &mut UaInfo) -> Result<()>
     where
         T: AsRef<str>,
     {
