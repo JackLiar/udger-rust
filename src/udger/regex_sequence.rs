@@ -72,9 +72,9 @@ impl RegexSequence {
         // sort ids by sequence
         id_seqs.sort_by(|s, o| {
             if s.1 > o.1 {
-                std::cmp::Ordering::Less
-            } else if s.1 < o.1 {
                 std::cmp::Ordering::Greater
+            } else if s.1 < o.1 {
+                std::cmp::Ordering::Less
             } else {
                 std::cmp::Ordering::Equal
             }
