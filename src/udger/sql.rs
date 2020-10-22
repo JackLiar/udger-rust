@@ -65,23 +65,37 @@ pub const SQL_CLIENT: &str = "SELECT \
     ur.rowid = ?";
 
 const OS_COLUMNS: &str = "family AS os_family, \
-family_code AS os_family_code, \
-name AS os, \
-name_code AS os_code, \
-homepage AS os_home_page, \
-icon AS os_icon, \
-icon_big AS os_icon_big, \
-vendor AS os_family_vendor, \
-vendor_code AS os_family_vendor_code, \
-vendor_homepage AS os_family_vendor_homepage, \
-'https://udger.com/resources/ua-list/os-detail?os=' || REPLACE(name, ' ', '%20') AS os_info_url ";
+    family_code AS os_family_code, \
+    name AS os, \
+    name_code AS os_code, \
+    homepage AS os_home_page, \
+    icon AS os_icon, \
+    icon_big AS os_icon_big, \
+    vendor AS os_family_vendor, \
+    vendor_code AS os_family_vendor_code, \
+    vendor_homepage AS os_family_vendor_homepage, \
+    'https://udger.com/resources/ua-list/os-detail?os=' || REPLACE(name, ' ', '%20') AS os_info_url ";
 
 const DEVICE_COLUMNS: &str = 
-        "name AS device_class, \
-        name_code AS device_class_code, \
-        icon AS device_class_icon, \
-        icon_big AS device_class_icon_big, \
-        'https://udger.com/resources/ua-list/device-detail?device=' || REPLACE(name, ' ', '%20') AS device_class_info_url ";
+    "name AS device_class, \
+    name_code AS device_class_code, \
+    icon AS device_class_icon, \
+    icon_big AS device_class_icon_big, \
+    'https://udger.com/resources/ua-list/device-detail?device=' || REPLACE(name, ' ', '%20') AS device_class_info_url ";
+
+pub const SQL_DEVICE_NAME_LIST: &str = "SELECT \
+    marketname, \
+    brand_code,\
+    brand, \
+    brand_url, \
+    icon, \
+    icon_big \
+    FROM \
+    udger_devicename_list \
+    JOIN \
+    udger_devicename_brand ON udger_devicename_brand.id=udger_devicename_list.brand_id \
+    WHERE \
+    regex_id = ? AND code = ?";
 
 lazy_static! {
     pub static ref SQL_OS: String = format!(

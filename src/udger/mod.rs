@@ -302,14 +302,16 @@ impl Udger {
             sequences.push(row.3 as u16);
             os_family_codes.push(row.4.clone());
             os_codes.push(row.5.clone());
-            // combine all the os_codes and os_family_codes
+            // combine all the os_codes and os_family_codes, except "-all-"
             // !!! we asume there are no conflict between os_code and os_family_codes !!!
             code_set.insert(row.4.clone());
-            code_set.insert(row.5.clone());
+            if row.5 != "-all-" {
+                code_set.insert(row.5.clone());
+            }
         }
         // now convert all os_codes and os_family_codes to "word_id"
         for (i, code) in code_set.iter().enumerate() {
-            self.os_codes.insert(code.clone(), i);
+            self.os_codes.insert(code.clone(), i + 1);
         }
         let range1 = os_family_codes
             .iter()
@@ -317,7 +319,14 @@ impl Udger {
             .collect::<Vec<u16>>();
         let range2 = os_codes
             .iter()
-            .map(|code| *self.os_codes.get(code).unwrap() as u16)
+            .map(|code| {
+                // if code is "-all-" return 0 which would be filtered then
+                if code != "-all-" {
+                    *self.os_codes.get(code).unwrap() as u16
+                } else {
+                    0
+                }
+            })
             .collect::<Vec<u16>>();
 
         self.device_name_regexes.init(
@@ -604,6 +613,68 @@ impl Udger {
         Ok(())
     }
 
+    fn detect_device_brand<T>(&self, ua: &T, data: &mut UdgerData, info: &mut UaInfo) -> Result<()>
+    where
+        T: AsRef<str>,
+    {
+        if info.os_family_code.is_empty() || info.os_code.is_empty() {
+            return Ok(());
+        }
+
+        let mut word_ids = Vec::new();
+        match self.os_codes.get(&info.os_family_code) {
+            None => (),
+            Some(code) => word_ids.push(*code as u16),
+        };
+        match self.os_codes.get(&info.os_code) {
+            None => (),
+            Some(code) => word_ids.push(*code as u16),
+        };
+
+        let row_id = match self.device_name_regexes.get_row_id(
+            &ua.as_ref(),
+            &mut data.device_name_regex_scratch,
+            &word_ids.iter(),
+        )? {
+            None => todo!(""),
+            Some(rid) => rid,
+        };
+
+        let id = match self.device_name_regexes.get_id(row_id) {
+            Some(id) => id,
+            None => todo!(),
+        };
+
+        let mut stmt = match &self.conn {
+            None => return Err(anyhow!(format!("Udger sqlite Connection is None"))),
+            Some(conn) => conn.prepare(&sql::SQL_DEVICE_NAME_LIST)?,
+        };
+        match stmt.query_row(params![id, "should be captured part"], |row| {
+            info.device_marketname = row.get(0).unwrap_or_default();
+            info.device_brand_code = row.get(1).unwrap_or_default();
+            info.device_brand = row.get(2).unwrap_or_default();
+            #[cfg(url)]
+            {
+                info.device_brand_url = row.get(3).unwrap_or_default();
+            }
+            #[cfg(icon)]
+            {
+                info.device_brand_icon = row.get(4).unwrap_or_default();
+                info.device_brand_icon_big = row.get(5).unwrap_or_default();
+            }
+            Ok(())
+        }) {
+            Err(err) => {
+                match err {
+                    Error::QueryReturnedNoRows => {}
+                    _ => return Err(anyhow!(err)),
+                };
+            }
+            Ok(_) => {}
+        };
+        Ok(())
+    }
+
     #[cfg(application)]
     fn detect_application<T>(&self, ua: &T, data: &mut UdgerData, _info: &mut UaInfo) -> Result<()>
     where
@@ -797,6 +868,49 @@ mod tests {
             assert_eq!(
                 info.device_class_info_url,
                 "https://udger.com/resources/ua-list/device-detail?device=Tablet"
+            );
+        }
+    }
+
+    #[test]
+    fn test_detect_device_brand() {
+        // some regular expressions in udgerdb_v3_test.data's udger_deviceclass_regex_words table
+        // could cause lots of incorrect matching,
+        // so use the real udger database to test this function
+        let mut udger = Udger::new();
+        udger
+            .init(PathBuf::from("./data/udgerdb_v3_full.dat"), 10000)
+            .unwrap();
+
+        let mut data = udger.alloc_udger_data().unwrap();
+        let mut info = UaInfo::default();
+        let ua = String::from(
+            "Mozilla/5.0 (iPad; CPU OS 7_0 like Mac OS X) AppleWebKit/537.51.1 (KHTML, like Gecko) Version/7.0 Mobile/11A465 Safari/9537.53",
+        );
+        udger.detect_client(&ua, &mut data, &mut info).unwrap();
+        udger.detect_os(&ua, &mut data, &mut info).unwrap();
+        assert_eq!(info.os_family_code, "ios");
+        udger.detect_device(&ua, &mut data, &mut info).unwrap();
+        udger
+            .detect_device_brand(&ua, &mut data, &mut info)
+            .unwrap();
+
+        assert_eq!(info.device_brand, "Apple");
+        assert_eq!(info.device_brand_code, "apple");
+        #[cfg(homepage)]
+        {
+            assert_eq!(info.device_brand_homepage, "http://www.apple.com/");
+        }
+        #[cfg(icon)]
+        {
+            assert_eq!(info.device_brand_icon, "apple.png");
+            assert_eq!(info.device_brand_icon_big, "apple_big.png");
+        }
+        #[cfg(url)]
+        {
+            assert_eq!(
+                info.device_brand_info_url,
+                "https://udger.com/resources/ua-list/devices-brand-detail?brand=apple"
             );
         }
     }
