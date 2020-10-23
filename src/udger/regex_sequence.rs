@@ -1,8 +1,10 @@
 use std::collections::HashMap;
+use std::ops::Range;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use hyperscan::chimera::prelude::*;
+use hyperscan::chimera::Capture;
 
 pub struct RegexSequenceScratch {
     /// Scratch name
@@ -23,6 +25,7 @@ impl RegexSequenceScratch {
 #[derive(Default)]
 pub struct RegexSequence {
     pub name: String,
+    pub need_capture: bool,
     db: Option<Database>,
     id_word_map: HashMap<u16, Vec<u16>>,
     rowid_sequence_map: HashMap<u16, u16>,
@@ -42,7 +45,11 @@ impl RegexSequence {
         &self.rowid_sequence_map
     }
 
-    fn get_ids<T>(&self, ua: &T, scratch: &mut RegexSequenceScratch) -> Result<Vec<u16>>
+    fn get_ids<T>(
+        &self,
+        ua: &T,
+        scratch: &mut RegexSequenceScratch,
+    ) -> Result<Vec<(u16, Option<Range<usize>>)>>
     where
         T: AsRef<[u8]>,
     {
@@ -53,14 +60,26 @@ impl RegexSequence {
                 db.scan(
                     ua.as_ref(),
                     &mut scratch.raw(),
-                    |id, _from, _to, _size, _captured| {
+                    |id, _from, _to, _size, captured| {
                         let seq = match self.rowid_sequence_map().get(&(id as u16)) {
                             // if no matching id is found, continue matching
                             None => return Matching::Continue,
                             Some(seq) => *seq,
                         };
 
-                        id_seqs.push((id as u16, seq));
+                        let captures: &[Capture] = match captured {
+                            None => {
+                                id_seqs.push(((id as u16, None), seq));
+                                return Matching::Continue;
+                            }
+                            Some(captures) => captures,
+                        };
+                        let range = match captures.get(0) {
+                            None => None,
+                            Some(cap) => Some(cap.range()),
+                        };
+
+                        id_seqs.push(((id as u16, range), seq));
 
                         Matching::Continue
                     },
@@ -80,7 +99,7 @@ impl RegexSequence {
             }
         });
 
-        Ok(id_seqs.iter().map(|(id, _)| *id).collect())
+        Ok(id_seqs.iter().map(|(id, _)| id.clone()).collect())
     }
 
     /// Initialize a RegexSequence
@@ -131,7 +150,11 @@ impl RegexSequence {
             self.rowid_id_map.insert(*rowid, *id);
         });
 
-        self.db = Some(Patterns::from(patterns).build()?);
+        if self.need_capture {
+            self.db = Some(Patterns::from(patterns).with_groups()?);
+        } else {
+            self.db = Some(Patterns::from(patterns).build()?);
+        }
 
         Ok(())
     }
@@ -149,12 +172,12 @@ impl RegexSequence {
         }
     }
 
-    pub fn get_row_id<'a, T, I>(
+    pub fn get_row_id_and_capture<'a, T, I>(
         &self,
         ua: &T,
         scratch: &mut RegexSequenceScratch,
         word_ids: &I,
-    ) -> Result<Option<u16>>
+    ) -> Result<Option<(u16, Option<Range<usize>>)>>
     where
         T: AsRef<[u8]>,
         I: Iterator<Item = &'a u16> + Clone,
@@ -165,7 +188,7 @@ impl RegexSequence {
 
         let ids = self.get_ids(ua, scratch)?;
 
-        for id in &ids {
+        for (id, range) in &ids {
             let word_vec = match self.id_word_map.get(&id) {
                 None => continue,
                 Some(vec) => vec,
@@ -179,7 +202,7 @@ impl RegexSequence {
                 }
             }
             if found_word_count == word_vec.len() {
-                return Ok(Some(*id));
+                return Ok(Some((*id, range.clone())));
             }
         }
 
@@ -225,7 +248,7 @@ mod tests {
 
         let word_ids: Vec<u16> = vec![1, 2, 3];
         let id = regex_seq
-            .get_row_id(
+            .get_row_id_and_capture(
                 &"This is a sentence contains the word regex",
                 &mut scratch,
                 &word_ids.iter(),
@@ -233,7 +256,7 @@ mod tests {
             .unwrap();
 
         assert!(matches!(id, Some(_)));
-        assert_eq!(id.unwrap(), 0);
+        assert_eq!(id.unwrap().0, 0);
     }
 
     #[test]
@@ -262,7 +285,7 @@ mod tests {
 
         let word_ids: Vec<u16> = vec![1, 2, 3];
         let id = regex_seq
-            .get_row_id(
+            .get_row_id_and_capture(
                 &"This is a sentence contains the word regex",
                 &mut scratch,
                 &word_ids.iter(),
@@ -298,7 +321,7 @@ mod tests {
 
         let word_ids: Vec<u16> = vec![1, 2, 3];
         let id = regex_seq
-            .get_row_id(
+            .get_row_id_and_capture(
                 &"This is a sentence contains the word regex",
                 &mut scratch,
                 &word_ids.iter(),

@@ -65,6 +65,7 @@ impl Udger {
         udger.client_regexes.name = String::from("client_regexes");
         udger.device_class_regexes.name = String::from("device_class_regexes");
         udger.device_name_regexes.name = String::from("device_name_regexes");
+        udger.device_name_regexes.need_capture = true;
         udger.os_regexes.name = String::from("os_regexes");
         #[cfg(application)]
         {
@@ -416,7 +417,7 @@ impl Udger {
             .client_words_detector
             .get_word_ids(&ua.as_ref(), &mut data.client_word_scratch)?;
 
-        let row_id = match self.client_regexes.get_row_id(
+        let (row_id, _) = match self.client_regexes.get_row_id_and_capture(
             &ua.as_ref(),
             &mut data.client_regex_scratch,
             &word_ids.iter(),
@@ -487,7 +488,7 @@ impl Udger {
             .os_words_detector
             .get_word_ids(&ua.as_ref(), &mut data.os_word_scratch)?;
 
-        let row_id = match self.os_regexes.get_row_id(
+        let (row_id, _) = match self.os_regexes.get_row_id_and_capture(
             &ua.as_ref(),
             &mut data.os_regex_scratch,
             &word_ids.iter(),
@@ -543,7 +544,7 @@ impl Udger {
             .device_class_words_detector
             .get_word_ids(&ua.as_ref(), &mut data.device_word_scratch)?;
 
-        let row_id = match self.device_class_regexes.get_row_id(
+        let (row_id, _) = match self.device_class_regexes.get_row_id_and_capture(
             &ua.as_ref(),
             &mut data.device_class_regex_scratch,
             &word_ids.iter(),
@@ -631,7 +632,7 @@ impl Udger {
             Some(code) => word_ids.push(*code as u16),
         };
 
-        let row_id = match self.device_name_regexes.get_row_id(
+        let (row_id, capture) = match self.device_name_regexes.get_row_id_and_capture(
             &ua.as_ref(),
             &mut data.device_name_regex_scratch,
             &word_ids.iter(),
@@ -645,11 +646,15 @@ impl Udger {
             None => todo!(),
         };
 
+        let capture = match capture {
+            None => todo!(),
+            Some(cap) => cap,
+        };
         let mut stmt = match &self.conn {
             None => return Err(anyhow!(format!("Udger sqlite Connection is None"))),
             Some(conn) => conn.prepare(&sql::SQL_DEVICE_NAME_LIST)?,
         };
-        match stmt.query_row(params![id, "should be captured part"], |row| {
+        match stmt.query_row(params![id, &ua.as_ref()[capture]], |row| {
             info.device_marketname = row.get(0).unwrap_or_default();
             info.device_brand_code = row.get(1).unwrap_or_default();
             info.device_brand = row.get(2).unwrap_or_default();
