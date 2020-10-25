@@ -694,12 +694,7 @@ impl Udger {
     where
         T: AsRef<str>,
     {
-        unsafe {
-            // We need to find a better way/strategy to handle un-utf8 input
-            let buf: &str = ua.as_ref();
-            let vec = Vec::from_raw_parts(buf.as_ptr() as *mut u8, buf.len(), buf.len());
-            info.ua = String::from_utf8_lossy(&vec).to_owned().to_string();
-        }
+        info.ua_string = ua.as_ref().to_string();
         self.detect_client(&ua, data, info)?;
         self.detect_os(&ua, data, info)?;
         #[cfg(application)]
@@ -919,5 +914,52 @@ mod tests {
                 "https://udger.com/resources/ua-list/devices-brand-detail?brand=apple"
             );
         }
+    }
+
+    #[test]
+    fn test_unrecognized() {
+        let mut udger = Udger::new();
+        udger
+            .init(PathBuf::from("./data/udgerdb_v3_full.dat"), 10000)
+            .unwrap();
+
+        let mut data = udger.alloc_udger_data().unwrap();
+        let mut info = UaInfo::default();
+        let ua = String::from("this is not an user-agent");
+
+        udger.parse_ua(&ua, &mut data, &mut info).unwrap();
+        assert_eq!(info.ua_class, "unrecognized");
+        assert_eq!(info.ua_class_code, "unrecognized");
+        #[cfg(application)]
+        {
+            assert_eq!(info.application_name, "");
+            assert_eq!(info.application_version, "");
+        }
+        assert_eq!(info.crawler_category, "");
+        assert_eq!(info.crawler_category_code, "");
+        assert_eq!(info.crawler_last_seen, "");
+        assert_eq!(info.crawler_respect_robotstxt, "");
+        assert_eq!(info.device_brand, "");
+        assert_eq!(info.device_brand_code, "");
+        assert_eq!(info.device_class, "");
+        assert_eq!(info.device_class_code, "");
+        assert_eq!(info.device_marketname, "");
+        assert_eq!(info.os, "");
+        assert_eq!(info.os_code, "");
+        assert_eq!(info.os_family, "");
+        assert_eq!(info.os_family_code, "");
+        assert_eq!(info.os_family_vendor, "");
+        assert_eq!(info.os_family_vendor_code, "");
+        assert_eq!(info.ua, "");
+        assert_eq!(info.ua_engine, "");
+        assert_eq!(info.ua_family, "");
+        assert_eq!(info.ua_family_code, "");
+        assert_eq!(info.ua_family_vendor, "");
+        assert_eq!(info.ua_family_vendor_code, "");
+        assert_eq!(info.ua_string, ua);
+        assert_eq!(info.ua_uptodate_current_version, "");
+        assert_eq!(info.ua_version, "");
+        assert_eq!(info.ua_version_major, "");
+        assert_eq!(info.ua_version_minor, "");
     }
 }
