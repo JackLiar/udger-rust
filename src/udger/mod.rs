@@ -637,19 +637,19 @@ impl Udger {
             &mut data.device_name_regex_scratch,
             &word_ids.iter(),
         )? {
-            None => todo!(""),
+            None => return Ok(()),
             Some(rid) => rid,
         };
 
         let id = match self.device_name_regexes.get_id(row_id) {
             Some(id) => id,
-            None => todo!(),
+            None => return Ok(()),
         };
-
         let capture = match capture {
-            None => todo!(),
+            None => return Ok(()),
             Some(cap) => cap,
         };
+
         let mut stmt = match &self.conn {
             None => return Err(anyhow!(format!("Udger sqlite Connection is None"))),
             Some(conn) => conn.prepare(&sql::SQL_DEVICE_NAME_LIST)?,
@@ -707,6 +707,7 @@ impl Udger {
             self.detect_application(&ua, data, info)?;
         }
         self.detect_device(&ua, data, info)?;
+        self.detect_device_brand(&ua, data, info)?;
 
         Ok(())
     }
