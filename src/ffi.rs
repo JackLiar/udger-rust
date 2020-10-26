@@ -7,10 +7,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct UaInfo {
     #[serde(skip_serializing)]
-    pub class_id: i8,
+    pub class_id: Option<u32>,
     #[serde(skip_serializing)]
-    pub client_id: i16,
-
+    pub client_id: Option<u32>,
     pub ua_class: String,
     pub ua_class_code: String,
     pub ua: String,
@@ -81,16 +80,6 @@ pub struct UaInfo {
     pub device_class_info_url: String,
     #[cfg(url)]
     pub device_brand_info_url: String,
-}
-
-#[no_mangle]
-unsafe extern "C" fn ua_info_get_class_id(info: *const UaInfo) -> i8 {
-    (*info).class_id
-}
-
-#[no_mangle]
-unsafe extern "C" fn ua_info_get_client_id(info: *const UaInfo) -> i16 {
-    (*info).client_id
 }
 
 #[no_mangle]
@@ -389,13 +378,6 @@ mod tests {
             assert_eq!(
                 ua_info_get_application_version(&info as *const UaInfo),
                 info.application_version.as_ptr() as *const c_char
-            );
-
-            assert_eq!(ua_info_get_class_id(&info as *const UaInfo), info.class_id);
-
-            assert_eq!(
-                ua_info_get_client_id(&info as *const UaInfo),
-                info.client_id
             );
 
             assert_eq!(
