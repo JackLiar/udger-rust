@@ -371,8 +371,8 @@ impl Udger {
         // If error is not QueryReturnedNoRows, return the original error
         // Otherwise continue
         match stmt.query_row(params![ua.as_ref()], |row| {
-            info.class_id = 99;
-            info.client_id = -1;
+            info.class_id = None;
+            info.client_id = None;
             info.ua_class = row.get(2)?;
             info.ua_class_code = row.get(3)?;
             info.ua = row.get(4)?;
@@ -550,35 +550,40 @@ impl Udger {
             &word_ids.iter(),
         )? {
             None => {
-                if info.class_id != -1 {
-                    let mut stmt = match &self.conn {
-                        None => return Err(anyhow!(format!("Udger sqlite Connection is None"))),
-                        Some(conn) => conn.prepare(&sql::SQL_CLIENT_CLASS)?,
-                    };
-                    let class_id = info.class_id;
-                    match stmt.query_row(params![class_id], |row| {
-                        info.device_class = row.get(0)?;
-                        info.device_class_code = row.get(1)?;
-                        #[cfg(icon)]
-                        {
-                            info.device_class_icon = row.get(2)?;
-                            info.device_class_icon_big = row.get(3)?;
-                        }
-                        #[cfg(url)]
-                        {
-                            info.device_class_info_url = row.get(4)?;
-                        }
-                        Ok(())
-                    }) {
-                        Err(err) => {
-                            match err {
-                                Error::QueryReturnedNoRows => {}
-                                _ => return Err(anyhow!(err)),
-                            };
-                        }
-                        Ok(_) => {}
-                    };
-                }
+                match info.class_id {
+                    Some(_) => {}
+                    None => {
+                        let mut stmt = match &self.conn {
+                            None => {
+                                return Err(anyhow!(format!("Udger sqlite Connection is None")))
+                            }
+                            Some(conn) => conn.prepare(&sql::SQL_CLIENT_CLASS)?,
+                        };
+                        let class_id = info.class_id;
+                        match stmt.query_row(params![class_id], |row| {
+                            info.device_class = row.get(0)?;
+                            info.device_class_code = row.get(1)?;
+                            #[cfg(icon)]
+                            {
+                                info.device_class_icon = row.get(2)?;
+                                info.device_class_icon_big = row.get(3)?;
+                            }
+                            #[cfg(url)]
+                            {
+                                info.device_class_info_url = row.get(4)?;
+                            }
+                            Ok(())
+                        }) {
+                            Err(err) => {
+                                match err {
+                                    Error::QueryReturnedNoRows => {}
+                                    _ => return Err(anyhow!(err)),
+                                };
+                            }
+                            Ok(_) => {}
+                        };
+                    }
+                };
                 return Ok(());
             }
             Some(rid) => rid,
@@ -729,8 +734,8 @@ mod tests {
         );
         udger.detect_client(&ua, &mut data, &mut info).unwrap();
 
-        assert_eq!(info.client_id, 3);
-        assert_eq!(info.class_id, 0);
+        assert_eq!(info.client_id.unwrap(), 3);
+        assert_eq!(info.class_id.unwrap(), 0);
         assert_eq!(info.ua, "Firefox");
         assert_eq!(info.ua_class, "Browser");
         assert_eq!(info.ua_class_code, "browser");
