@@ -224,7 +224,7 @@ impl Udger {
             )
             .as_str(),
         )?;
-        let suffix_regex = Regex::new(r"\s?$").unwrap();
+        let suffix_regex = Regex::new(r"\s?$")?;
         let rows = stmt.query_map(params![], |row| {
             let rowid: i32 = row.get(0)?;
             let id: i32 = row.get(1)?;
@@ -291,7 +291,7 @@ impl Udger {
             )
             .as_str(),
         )?;
-        let suffix_regex = Regex::new(r"\s?$").unwrap();
+        let suffix_regex = Regex::new(r"\s?$")?;
         let rows = stmt.query_map(params![], |row| {
             let rowid: i32 = row.get(0)?;
             let id: i32 = row.get(1)?;
