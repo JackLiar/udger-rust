@@ -10,6 +10,7 @@ name = "udger"
 [dependencies]
 anyhow = "1.0"
 # uchardet = "2.0.4"
+clru = "0.3"
 hyperscan = { version="0.2.0", features=["chimera"] }
 lazy_static = "1.4.0"
 libc = "0.2"

@@ -1,4 +1,5 @@
 extern crate anyhow;
+extern crate clru;
 extern crate hyperscan;
 #[macro_use]
 extern crate lazy_static;

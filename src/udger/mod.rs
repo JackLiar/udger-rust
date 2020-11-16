@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use anyhow::{anyhow, Result};
 use hyperscan::prelude::{Pattern, Patterns};
@@ -31,11 +32,28 @@ pub struct UdgerData {
     pub device_class_regex_scratch: RegexSequenceScratch,
     pub device_name_regex_scratch: RegexSequenceScratch,
     pub os_regex_scratch: RegexSequenceScratch,
+
+    cache: clru::CLruCache<String, Rc<UaInfo>>,
+}
+
+impl UdgerData {
+    #[inline]
+    pub fn get(&mut self, ua: &String) -> Option<Rc<UaInfo>> {
+        match self.cache.get(ua) {
+            Some(cached) => Some(cached.clone()),
+            None => None,
+        }
+    }
+
+    #[inline]
+    pub fn set(&mut self, ua: &String, info: Rc<UaInfo>) {
+        self.cache.put(ua.clone(), info);
+    }
 }
 
 #[derive(Default)]
 pub struct Udger {
-    capacity: u16,
+    capacity: usize,
     conn: Option<Connection>,
 
     #[cfg(application)]
@@ -75,7 +93,7 @@ impl Udger {
         udger
     }
 
-    pub fn init(&mut self, db_path: PathBuf, capacity: u16) -> Result<()> {
+    pub fn init(&mut self, db_path: PathBuf, capacity: usize) -> Result<()> {
         println!("Initializing Udger");
         self.capacity = capacity;
 
@@ -355,6 +373,7 @@ impl Udger {
             device_class_regex_scratch: self.device_class_regexes.alloc_scratch()?,
             device_name_regex_scratch: self.device_name_regexes.alloc_scratch()?,
             os_regex_scratch: self.os_regexes.alloc_scratch()?,
+            cache: clru::CLruCache::new(self.capacity as usize),
         })
     }
 
@@ -695,21 +714,33 @@ impl Udger {
         Ok(())
     }
 
-    pub fn parse_ua<T>(&self, ua: &T, data: &mut UdgerData, info: &mut UaInfo) -> Result<()>
+    pub fn parse_ua<T>(&self, ua: &T, data: &mut UdgerData) -> Result<Rc<UaInfo>>
     where
         T: AsRef<str>,
     {
-        info.ua_string = ua.as_ref().to_string();
-        self.detect_client(&ua, data, info)?;
-        self.detect_os(&ua, data, info)?;
+        // info.ua_string = ua.as_ref().to_string();
+        // try to get cached ua info
+        let ua = ua.as_ref().to_string();
+        match data.get(&ua) {
+            Some(cached) => return Ok(cached),
+            None => {}
+        };
+
+        let mut info = Rc::new(UaInfo::default());
+        Rc::get_mut(&mut info).unwrap().ua_string = ua.clone();
+
+        self.detect_client(&ua, data, Rc::get_mut(&mut info).unwrap())?;
+        self.detect_os(&ua, data, Rc::get_mut(&mut info).unwrap())?;
         #[cfg(application)]
         {
-            self.detect_application(&ua, data, info)?;
+            self.detect_application(&ua, data, Rc::get_mut(&mut info).unwrap())?;
         }
-        self.detect_device(&ua, data, info)?;
-        self.detect_device_brand(&ua, data, info)?;
+        self.detect_device(&ua, data, Rc::get_mut(&mut info).unwrap())?;
+        self.detect_device_brand(&ua, data, Rc::get_mut(&mut info).unwrap())?;
 
-        Ok(())
+        data.set(&ua, info.clone());
+
+        Ok(info)
     }
 }
 
@@ -929,10 +960,9 @@ mod tests {
             .unwrap();
 
         let mut data = udger.alloc_udger_data().unwrap();
-        let mut info = UaInfo::default();
         let ua = String::from("this is not an user-agent");
 
-        udger.parse_ua(&ua, &mut data, &mut info).unwrap();
+        let info = udger.parse_ua(&ua, &mut data).unwrap();
         assert_eq!(info.ua_class, "unrecognized");
         assert_eq!(info.ua_class_code, "unrecognized");
         #[cfg(application)]
