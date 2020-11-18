@@ -567,7 +567,7 @@ impl Udger {
         Ok(())
     }
 
-    fn detect_device<T>(&self, ua: &T, data: &mut UdgerData, info: &mut UaInfo) -> Result<()>
+    fn detect_device_class<T>(&self, ua: &T, data: &mut UdgerData, info: &mut UaInfo) -> Result<()>
     where
         T: AsRef<str>,
     {
@@ -582,15 +582,14 @@ impl Udger {
         )? {
             None => {
                 match info.class_id {
-                    Some(_) => {}
-                    None => {
+                    None => {}
+                    Some(class_id) => {
                         let mut stmt = match &self.conn {
                             None => {
                                 return Err(anyhow!(format!("Udger sqlite Connection is None")))
                             }
                             Some(conn) => conn.prepare(&sql::SQL_CLIENT_CLASS)?,
                         };
-                        let class_id = info.class_id;
                         match stmt.query_row(params![class_id], |row| {
                             info.device_class = row.get(0)?;
                             info.device_class_code = row.get(1)?;
@@ -747,7 +746,7 @@ impl Udger {
         {
             self.detect_application(&ua, data, Rc::get_mut(&mut info).unwrap())?;
         }
-        self.detect_device(&ua, data, Rc::get_mut(&mut info).unwrap())?;
+        self.detect_device_class(&ua, data, Rc::get_mut(&mut info).unwrap())?;
         self.detect_device_brand(&ua, data, Rc::get_mut(&mut info).unwrap())?;
 
         data.set(&ua, info.clone());
@@ -888,7 +887,7 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_device() {
+    fn test_detect_device_class() {
         // some regular expressions in udgerdb_v3_test.data's udger_deviceclass_regex_words table
         // could cause lots of incorrect matching,
         // so use the real udger database to test this function
@@ -903,7 +902,9 @@ mod tests {
             "Mozilla/5.0 (iPad; CPU OS 7_0 like Mac OS X) AppleWebKit/537.51.1 (KHTML, like Gecko) Version/7.0 Mobile/11A465 Safari/9537.53",
         );
         udger.detect_client(&ua, &mut data, &mut info).unwrap();
-        udger.detect_device(&ua, &mut data, &mut info).unwrap();
+        udger
+            .detect_device_class(&ua, &mut data, &mut info)
+            .unwrap();
 
         assert_eq!(info.device_class, "Tablet");
         assert_eq!(info.device_class_code, "tablet");
@@ -919,6 +920,17 @@ mod tests {
                 "https://udger.com/resources/ua-list/device-detail?device=Tablet"
             );
         }
+
+        let mut info = UaInfo::default();
+        let ua =
+            String::from("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) chrome/79.0.3945.117 Safari/537.36");
+        udger.detect_client(&ua, &mut data, &mut info).unwrap();
+        udger
+            .detect_device_class(&ua, &mut data, &mut info)
+            .unwrap();
+
+        assert_eq!(info.device_class, "Desktop");
+        assert_eq!(info.device_class_code, "desktop");
     }
 
     #[test]
@@ -939,7 +951,9 @@ mod tests {
         udger.detect_client(&ua, &mut data, &mut info).unwrap();
         udger.detect_os(&ua, &mut data, &mut info).unwrap();
         assert_eq!(info.os_family_code, "ios");
-        udger.detect_device(&ua, &mut data, &mut info).unwrap();
+        udger
+            .detect_device_class(&ua, &mut data, &mut info)
+            .unwrap();
         udger
             .detect_device_brand(&ua, &mut data, &mut info)
             .unwrap();
