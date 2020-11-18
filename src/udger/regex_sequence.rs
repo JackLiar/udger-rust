@@ -201,7 +201,7 @@ impl RegexSequence {
                     Some(_) => found_word_count += 1,
                 }
             }
-            if found_word_count == word_vec.len() {
+            if found_word_count >= word_vec.len() {
                 return Ok(Some((*id, range.clone())));
             }
         }
