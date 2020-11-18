@@ -20,6 +20,7 @@ use self::word_detector::{WordDetector, WordDetectorScratch};
 const UNRECOGNIZED: &str = "unrecognized";
 
 pub struct UdgerData {
+    conn: Connection,
     #[cfg(application)]
     pub app_word_scratch: WordDetectorScratch,
     pub client_word_scratch: WordDetectorScratch,
@@ -54,7 +55,7 @@ impl UdgerData {
 #[derive(Default)]
 pub struct Udger {
     capacity: usize,
-    conn: Option<Connection>,
+    db_fpath: PathBuf,
 
     #[cfg(application)]
     application_words_detector: WordDetector,
@@ -93,11 +94,12 @@ impl Udger {
         udger
     }
 
-    pub fn init(&mut self, db_path: PathBuf, capacity: usize) -> Result<()> {
+    pub fn init(&mut self, db_fpath: PathBuf, capacity: usize) -> Result<()> {
         println!("Initializing Udger");
         self.capacity = capacity;
+        self.db_fpath = db_fpath;
 
-        let conn = Connection::open(db_path)?;
+        let conn = Connection::open(&self.db_fpath)?;
 
         #[cfg(application)]
         {
@@ -174,7 +176,6 @@ impl Udger {
             &conn,
         )?;
 
-        self.conn = Some(conn);
         println!("Finish initializing Udger");
 
         Ok(())
@@ -363,6 +364,7 @@ impl Udger {
 
     pub fn alloc_udger_data(&self) -> Result<UdgerData> {
         Ok(UdgerData {
+            conn: Connection::open(&self.db_fpath)?,
             #[cfg(application)]
             app_word_scratch: self.application_words_detector.alloc_scratch()?,
             client_word_scratch: self.client_words_detector.alloc_scratch()?,
@@ -382,10 +384,7 @@ impl Udger {
     where
         T: AsRef<str>,
     {
-        let mut stmt = match &self.conn {
-            None => return Err(anyhow!(format!("Udger sqlite Connection is None"))),
-            Some(conn) => conn.prepare(sql::SQL_CRAWLER)?,
-        };
+        let stmt = &mut data.conn.prepare(sql::SQL_CRAWLER)?;
 
         // If any rows are returned, is classified as crawler
         // If error is not QueryReturnedNoRows, return the original error
@@ -450,10 +449,7 @@ impl Udger {
             Some(v) => v,
         };
 
-        stmt = match &self.conn {
-            None => return Err(anyhow!(format!("Udger sqlite Connection is None"))),
-            Some(conn) => conn.prepare(sql::SQL_CLIENT)?,
-        };
+        let stmt = &mut data.conn.prepare(sql::SQL_CLIENT)?;
         match stmt.query_row(params![row_id], |row| {
             info.client_id = row.get(1)?;
             info.class_id = row.get(2)?;
@@ -528,10 +524,7 @@ impl Udger {
             Some(rid) => rid,
         };
 
-        let mut stmt = match &self.conn {
-            None => return Err(anyhow!(format!("Udger sqlite Connection is None"))),
-            Some(conn) => conn.prepare(&sql::SQL_OS)?,
-        };
+        let stmt = &mut data.conn.prepare(&sql::SQL_OS)?;
         match stmt.query_row(params![row_id], |row| {
             info.os_family = row.get(1)?;
             info.os_family_code = row.get(2)?;
@@ -584,12 +577,7 @@ impl Udger {
                 match info.class_id {
                     None => {}
                     Some(class_id) => {
-                        let mut stmt = match &self.conn {
-                            None => {
-                                return Err(anyhow!(format!("Udger sqlite Connection is None")))
-                            }
-                            Some(conn) => conn.prepare(&sql::SQL_CLIENT_CLASS)?,
-                        };
+                        let stmt = &mut data.conn.prepare(&sql::SQL_CLIENT_CLASS)?;
                         match stmt.query_row(params![class_id], |row| {
                             info.device_class = row.get(0)?;
                             info.device_class_code = row.get(1)?;
@@ -619,10 +607,7 @@ impl Udger {
             Some(rid) => rid,
         };
 
-        let mut stmt = match &self.conn {
-            None => return Err(anyhow!(format!("Udger sqlite Connection is None"))),
-            Some(conn) => conn.prepare(&sql::SQL_DEVICE)?,
-        };
+        let stmt = &mut data.conn.prepare(&sql::SQL_DEVICE)?;
         match stmt.query_row(params![row_id], |row| {
             info.device_class = row.get(1)?;
             info.device_class_code = row.get(2)?;
@@ -685,10 +670,7 @@ impl Udger {
             Some(cap) => cap,
         };
 
-        let mut stmt = match &self.conn {
-            None => return Err(anyhow!(format!("Udger sqlite Connection is None"))),
-            Some(conn) => conn.prepare(&sql::SQL_DEVICE_NAME_LIST)?,
-        };
+        let stmt = &mut data.conn.prepare(sql::SQL_DEVICE_NAME_LIST)?;
         match stmt.query_row(params![id, &ua.as_ref()[capture]], |row| {
             info.device_marketname = row.get(0).unwrap_or_default();
             info.device_brand_code = row.get(1).unwrap_or_default();
@@ -760,9 +742,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_detect_application() {}
-
-    #[test]
     fn test_detect_client() {
         let mut udger = Udger::new();
         udger
@@ -776,6 +755,7 @@ mod tests {
         );
         udger.detect_client(&ua, &mut data, &mut info).unwrap();
 
+        println!("{}", serde_json::to_string_pretty(&info).unwrap());
         assert_eq!(info.client_id.unwrap(), 3);
         assert_eq!(info.class_id.unwrap(), 0);
         assert_eq!(info.ua, "Firefox 40.0");
