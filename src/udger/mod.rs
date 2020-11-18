@@ -138,6 +138,7 @@ impl Udger {
             )?;
         }
 
+        self.client_regexes.need_capture = true;
         Udger::init_regex_sequence(
             &mut self.client_regexes,
             &String::from("udger_client_regex"),
@@ -436,7 +437,7 @@ impl Udger {
             .client_words_detector
             .get_word_ids(&ua.as_ref(), &mut data.client_word_scratch)?;
 
-        let (row_id, _) = match self.client_regexes.get_row_id_and_capture(
+        let (row_id, range) = match self.client_regexes.get_row_id_and_capture(
             &ua.as_ref(),
             &mut data.client_regex_scratch,
             &word_ids.iter(),
@@ -446,7 +447,7 @@ impl Udger {
                 info.ua_class_code = String::from(UNRECOGNIZED);
                 return Ok(());
             }
-            Some(rid) => rid,
+            Some(v) => v,
         };
 
         stmt = match &self.conn {
@@ -494,6 +495,17 @@ impl Udger {
                 };
             }
             Ok(_) => {}
+        };
+
+        match range {
+            None => {}
+            Some(range) => {
+                info.ua_version = (&ua.as_ref()[range]).to_string();
+                info.ua.extend([' '].iter());
+                info.ua.extend(info.ua_version.chars());
+                let split: Vec<&str> = info.ua_version.split('.').collect();
+                info.ua_version_major = split[0].to_string();
+            }
         };
 
         Ok(())
@@ -767,15 +779,15 @@ mod tests {
 
         assert_eq!(info.client_id.unwrap(), 3);
         assert_eq!(info.class_id.unwrap(), 0);
-        assert_eq!(info.ua, "Firefox");
+        assert_eq!(info.ua, "Firefox 40.0");
         assert_eq!(info.ua_class, "Browser");
         assert_eq!(info.ua_class_code, "browser");
         assert_eq!(info.ua_engine, "Gecko");
-        // assert_eq!(info.ua_version, "40.0");
-        // assert_eq!(info.ua_version_major, "40");
         assert_eq!(info.ua_uptodate_current_version, "50");
         assert_eq!(info.ua_family, "Firefox");
         assert_eq!(info.ua_family_code, "firefox");
+        assert_eq!(info.ua_version, "40.0");
+        assert_eq!(info.ua_version_major, "40");
         #[cfg(homepage)]
         {
             assert_eq!(info.ua_family_homepage, "http://www.firefox.com/");

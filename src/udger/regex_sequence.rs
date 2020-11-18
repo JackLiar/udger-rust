@@ -74,7 +74,7 @@ impl RegexSequence {
                             }
                             Some(captures) => captures,
                         };
-                        let range = match captures.get(0) {
+                        let range = match captures.get(1) {
                             None => None,
                             Some(cap) => Some(cap.range()),
                         };
