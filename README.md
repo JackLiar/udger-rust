@@ -1,5 +1,5 @@
 # udger-rust
 
-[![dependency status](https://deps.rs/repo/github/deps-rs/deps.rs/status.svg)](https://deps.rs/repo/github/deps-rs/deps.rs)
+[![dependency status](https://deps.rs/repo/github/jackliar/udger-rust/status.svg)](https://deps.rs/repo/github/jackliar/udger-rust)
 
 Udger Rust implementation, powered by Rust, Hyperscan &amp; Chimera
