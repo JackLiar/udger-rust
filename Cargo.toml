@@ -1,6 +1,6 @@
 [package]
 name = "udger-rust"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["jack"]
 
 [lib]
@@ -10,21 +10,21 @@ name = "udger"
 [dependencies]
 anyhow = "1.0"
 # uchardet = "2.0.4"
-clru = "0.3"
-hyperscan = { version="0.2.0", features=["chimera"] }
+clru = "0.4"
+hyperscan = { version = "0.2", features = ["chimera"] }
 lazy_static = "1.4.0"
 libc = "0.2"
 log = "0.4"
 regex = "1.4"
-serde = { version="1.0", features=["derive"] }
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 [dependencies.rusqlite]
-version = "0.24"
+version = "0.25"
 features = ["bundled"]
 
 [features]
 icon = []
 homepage = []
 url = []
-application=[]
+application = []

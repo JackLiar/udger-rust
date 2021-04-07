@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -363,6 +364,10 @@ impl Udger {
     }
 
     pub fn alloc_udger_data(&self) -> Result<UdgerData> {
+        let capacity = NonZeroUsize::new(self.capacity).ok_or(anyhow!(
+            "LRU cache size is zero, please make sure it's greater than zero"
+        ))?;
+
         Ok(UdgerData {
             conn: Connection::open(&self.db_fpath)?,
             #[cfg(application)]
@@ -376,7 +381,7 @@ impl Udger {
             device_class_regex_scratch: self.device_class_regexes.alloc_scratch()?,
             device_name_regex_scratch: self.device_name_regexes.alloc_scratch()?,
             os_regex_scratch: self.os_regexes.alloc_scratch()?,
-            cache: clru::CLruCache::new(self.capacity as usize),
+            cache: clru::CLruCache::new(capacity),
         })
     }
 
