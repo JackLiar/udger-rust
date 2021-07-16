@@ -9,4 +9,5 @@ extern crate rusqlite;
 extern crate serde;
 
 pub mod ffi;
-pub mod udger;
+mod udger;
+pub use udger::{Udger, UdgerData};
