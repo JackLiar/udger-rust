@@ -33,10 +33,6 @@ pub struct RegexSequence {
 }
 
 impl RegexSequence {
-    fn new() -> Self {
-        Self::default()
-    }
-
     fn db(&self) -> &Option<Database> {
         &self.db
     }
@@ -54,50 +50,36 @@ impl RegexSequence {
         T: AsRef<[u8]>,
     {
         let mut id_seqs = Vec::new();
-        match &self.db() {
-            None => {}
-            Some(db) => {
-                db.scan(
-                    ua.as_ref(),
-                    &mut scratch.raw(),
-                    |id, _from, _to, _size, captured| {
-                        let seq = match self.rowid_sequence_map().get(&(id as u16)) {
-                            // if no matching id is found, continue matching
-                            None => return Matching::Continue,
-                            Some(seq) => *seq,
-                        };
+        if let Some(db) = &self.db() {
+            db.scan(
+                ua.as_ref(),
+                scratch.raw(),
+                |id, _from, _to, _size, captured| {
+                    let seq = match self.rowid_sequence_map().get(&(id as u16)) {
+                        // if no matching id is found, continue matching
+                        None => return Matching::Continue,
+                        Some(seq) => *seq,
+                    };
 
-                        let captures: &[Capture] = match captured {
-                            None => {
-                                id_seqs.push(((id as u16, None), seq));
-                                return Matching::Continue;
-                            }
-                            Some(captures) => captures,
-                        };
-                        let range = match captures.get(1) {
-                            None => None,
-                            Some(cap) => Some(cap.range()),
-                        };
+                    let captures: &[Capture] = match captured {
+                        None => {
+                            id_seqs.push(((id as u16, None), seq));
+                            return Matching::Continue;
+                        }
+                        Some(captures) => captures,
+                    };
+                    let range = captures.get(1).map(|cap| cap.range());
 
-                        id_seqs.push(((id as u16, range), seq));
+                    id_seqs.push(((id as u16, range), seq));
 
-                        Matching::Continue
-                    },
-                    |_err_type, _id| Matching::Continue,
-                )?;
-            }
+                    Matching::Continue
+                },
+                |_err_type, _id| Matching::Continue,
+            )?;
         }
 
         // sort ids by sequence
-        id_seqs.sort_by(|s, o| {
-            if s.1 > o.1 {
-                std::cmp::Ordering::Greater
-            } else if s.1 < o.1 {
-                std::cmp::Ordering::Less
-            } else {
-                std::cmp::Ordering::Equal
-            }
-        });
+        id_seqs.sort_by(|s, o| s.1.cmp(&o.1));
 
         Ok(id_seqs.iter().map(|(id, _)| id.clone()).collect())
     }
@@ -127,9 +109,8 @@ impl RegexSequence {
         tup.for_each(|(((((rowid, id), regex), seq), word1), word2)| {
             let mut pattern = match Pattern::from_str(regex.as_ref()) {
                 Ok(ptrn) => ptrn,
-                Err(err) => {
-                    eprintln!("{:?}", err);
-                    return ();
+                Err(_err) => {
+                    return;
                 }
             };
             pattern.id = Some(*rowid as usize);
@@ -189,7 +170,7 @@ impl RegexSequence {
         let ids = self.get_ids(ua, scratch)?;
 
         for (id, range) in &ids {
-            let word_vec = match self.id_word_map.get(&id) {
+            let word_vec = match self.id_word_map.get(id) {
                 None => continue,
                 Some(vec) => vec,
             };
@@ -211,10 +192,7 @@ impl RegexSequence {
 
     /// Get the actual id column of the sqlite table
     pub fn get_id(&self, rowid: u16) -> Option<u16> {
-        match self.rowid_id_map.get(&rowid) {
-            None => None,
-            Some(id) => Some(*id),
-        }
+        self.rowid_id_map.get(&rowid).copied()
     }
 }
 
@@ -224,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_get_row_id() {
-        let mut regex_seq = RegexSequence::new();
+        let mut regex_seq = RegexSequence::default();
 
         let rowids: Vec<u16> = vec![0];
         let ids: Vec<u16> = vec![1];
@@ -261,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_get_row_id_returns_none() {
-        let mut regex_seq = RegexSequence::new();
+        let mut regex_seq = RegexSequence::default();
 
         let rowids: Vec<u16> = vec![0];
         let ids: Vec<u16> = vec![1];
@@ -297,7 +275,7 @@ mod tests {
 
     #[test]
     fn test_get_row_id_multiple_word_id() {
-        let mut regex_seq = RegexSequence::new();
+        let mut regex_seq = RegexSequence::default();
 
         let rowids: Vec<u16> = vec![0, 1];
         let ids: Vec<u16> = vec![1, 2];

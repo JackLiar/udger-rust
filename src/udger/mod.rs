@@ -9,7 +9,7 @@ use hyperscan::{ExprExt, PatternFlags};
 use regex::Regex;
 use rusqlite::{params, Connection, Error};
 
-use crate::ffi::UaInfo;
+use crate::UaInfo;
 
 mod regex_sequence;
 mod sql;
@@ -22,13 +22,13 @@ const UNRECOGNIZED: &str = "unrecognized";
 
 pub struct UdgerData {
     conn: Connection,
-    #[cfg(application)]
+    #[cfg(feature = "application")]
     pub app_word_scratch: WordDetectorScratch,
     pub client_word_scratch: WordDetectorScratch,
     pub device_word_scratch: WordDetectorScratch,
     pub os_word_scratch: WordDetectorScratch,
 
-    #[cfg(application)]
+    #[cfg(feature = "application")]
     pub app_regex_scratch: RegexSequenceScratch,
     pub client_regex_scratch: RegexSequenceScratch,
     pub device_class_regex_scratch: RegexSequenceScratch,
@@ -40,16 +40,13 @@ pub struct UdgerData {
 
 impl UdgerData {
     #[inline]
-    pub fn get(&mut self, ua: &String) -> Option<Rc<UaInfo>> {
-        match self.cache.get(ua) {
-            Some(cached) => Some(cached.clone()),
-            None => None,
-        }
+    pub fn get(&mut self, ua: &str) -> Option<Rc<UaInfo>> {
+        self.cache.get(ua).cloned()
     }
 
     #[inline]
-    pub fn set(&mut self, ua: &String, info: Rc<UaInfo>) {
-        self.cache.put(ua.clone(), info);
+    pub fn set(&mut self, ua: &str, info: Rc<UaInfo>) {
+        self.cache.put(ua.to_string(), info);
     }
 }
 
@@ -58,13 +55,13 @@ pub struct Udger {
     capacity: usize,
     db_fpath: PathBuf,
 
-    #[cfg(application)]
+    #[cfg(feature = "application")]
     application_words_detector: WordDetector,
     client_words_detector: WordDetector,
     device_class_words_detector: WordDetector,
     os_words_detector: WordDetector,
 
-    #[cfg(application)]
+    #[cfg(feature = "application")]
     application_regexes: RegexSequence,
     client_regexes: RegexSequence,
     device_class_regexes: RegexSequence,
@@ -77,8 +74,10 @@ pub struct Udger {
 
 impl Udger {
     pub fn new() -> Udger {
-        let mut udger = Udger::default();
-        udger.capacity = 10000;
+        let mut udger = Udger {
+            capacity: 10000,
+            ..Default::default()
+        };
         udger.client_words_detector.name = String::from("client_words_detector");
         udger.device_class_words_detector.name = String::from("device_class_words_detector");
         udger.os_words_detector.name = String::from("os_words_detector");
@@ -87,7 +86,7 @@ impl Udger {
         udger.device_name_regexes.name = String::from("device_name_regexes");
         udger.device_name_regexes.need_capture = true;
         udger.os_regexes.name = String::from("os_regexes");
-        #[cfg(application)]
+        #[cfg(feature = "application")]
         {
             udger.application_words_detector.name = String::from("application_words_detector");
             udger.application_regexes.name = String::from("application_regexes");
@@ -96,47 +95,42 @@ impl Udger {
     }
 
     pub fn init(&mut self, db_fpath: PathBuf, capacity: usize) -> Result<()> {
-        println!("Initializing Udger");
         self.capacity = capacity;
         self.db_fpath = db_fpath;
 
         let conn = Connection::open(&self.db_fpath)?;
 
-        #[cfg(application)]
+        #[cfg(feature = "application")]
         {
             Udger::init_word_detector(
                 &mut self.application_words_detector,
-                &String::from("udger_application_regex_words"),
+                "udger_application_regex_words",
                 &conn,
             )?;
         }
 
         Udger::init_word_detector(
             &mut self.client_words_detector,
-            &String::from("udger_client_regex_words"),
+            "udger_client_regex_words",
             &conn,
         )?;
 
         Udger::init_word_detector(
             &mut self.device_class_words_detector,
-            &String::from("udger_deviceclass_regex_words"),
+            "udger_deviceclass_regex_words",
             &conn,
         )?;
 
-        Udger::init_word_detector(
-            &mut self.os_words_detector,
-            &String::from("udger_os_regex_words"),
-            &conn,
-        )?;
+        Udger::init_word_detector(&mut self.os_words_detector, "udger_os_regex_words", &conn)?;
 
-        #[cfg(application)]
+        #[cfg(feature = "application")]
         {
             Udger::init_regex_sequence(
                 &mut self.application_regexes,
-                &String::from("udger_application_regex"),
-                &String::from("application_id"),
-                &String::from("word_id"),
-                &String::from("word2_id"),
+                "udger_application_regex",
+                "application_id",
+                "word_id",
+                "word2_id",
                 &conn,
             )?;
         }
@@ -144,50 +138,48 @@ impl Udger {
         self.client_regexes.need_capture = true;
         Udger::init_regex_sequence(
             &mut self.client_regexes,
-            &String::from("udger_client_regex"),
-            &String::from("client_id"),
-            &String::from("word_id"),
-            &String::from("word2_id"),
+            "udger_client_regex",
+            "client_id",
+            "word_id",
+            "word2_id",
             &conn,
         )?;
 
         Udger::init_regex_sequence(
             &mut self.device_class_regexes,
-            &String::from("udger_deviceclass_regex"),
-            &String::from("deviceclass_id"),
-            &String::from("word_id"),
-            &String::from("word2_id"),
+            "udger_deviceclass_regex",
+            "deviceclass_id",
+            "word_id",
+            "word2_id",
             &conn,
         )?;
 
         self.init_device_name_regex_sequence(
-            &String::from("udger_devicename_regex"),
-            &String::from("id"),
-            &String::from("os_family_code"),
-            &String::from("os_code"),
+            "udger_devicename_regex",
+            "id",
+            "os_family_code",
+            "os_code",
             &conn,
         )?;
 
         Udger::init_regex_sequence(
             &mut self.os_regexes,
-            &String::from("udger_os_regex"),
-            &String::from("os_id"),
-            &String::from("word_id"),
-            &String::from("word2_id"),
+            "udger_os_regex",
+            "os_id",
+            "word_id",
+            "word2_id",
             &conn,
         )?;
-
-        println!("Finish initializing Udger");
 
         Ok(())
     }
 
     fn init_word_detector(
         detector: &mut WordDetector,
-        table: &String,
+        table: &str,
         conn: &Connection,
     ) -> Result<()> {
-        let mut stmt = conn.prepare(format!("SELECT id, word, count FROM {}", table).as_str())?;
+        let mut stmt = conn.prepare(&format!("SELECT id, word, count FROM {}", table))?;
         let mut rows = stmt.query(params![])?;
         let mut words = Vec::new();
         let mut ids = Vec::new();
@@ -214,26 +206,23 @@ impl Udger {
 
     fn init_regex_sequence(
         seq: &mut RegexSequence,
-        table: &String,
-        id_column_name: &String,
-        column1: &String,
-        column2: &String,
+        table: &str,
+        id_column_name: &str,
+        column1: &str,
+        column2: &str,
         conn: &Connection,
     ) -> Result<()> {
-        let mut stmt = conn.prepare(
-            format!(
-                "SELECT rowid, {}, regstring, sequence, {}, {} FROM {} ORDER BY sequence;",
-                id_column_name, column1, column2, table
-            )
-            .as_str(),
-        )?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT rowid, {}, regstring, sequence, {}, {} FROM {} ORDER BY sequence;",
+            id_column_name, column1, column2, table
+        ))?;
         let suffix_regex = Regex::new(r"\s?$")?;
         let rows = stmt.query_map(params![], |row| {
             let rowid: i32 = row.get(0)?;
             let id: i32 = row.get(1)?;
             let expression: String = row.get(2)?;
             let expression = suffix_regex.replace(expression.as_ref(), "").to_string();
-            let expression = match expression.strip_suffix(" ") {
+            let expression = match expression.strip_suffix(' ') {
                 None => expression,
                 Some(expr) => expr.to_string(),
             };
@@ -281,19 +270,16 @@ impl Udger {
     /// use the same api of init_regex_sequence
     fn init_device_name_regex_sequence(
         &mut self,
-        table: &String,
-        id_column_name: &String,
-        column1: &String,
-        column2: &String,
+        table: &str,
+        id_column_name: &str,
+        column1: &str,
+        column2: &str,
         conn: &Connection,
     ) -> Result<()> {
-        let mut stmt = conn.prepare(
-            format!(
-                "SELECT rowid, {}, regstring, sequence, {}, {} FROM {} ORDER BY sequence;",
-                id_column_name, column1, column2, table
-            )
-            .as_str(),
-        )?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT rowid, {}, regstring, sequence, {}, {} FROM {} ORDER BY sequence;",
+            id_column_name, column1, column2, table
+        ))?;
         let suffix_regex = Regex::new(r"\s?$")?;
         let rows = stmt.query_map(params![], |row| {
             let rowid: i32 = row.get(0)?;
@@ -364,18 +350,18 @@ impl Udger {
     }
 
     pub fn alloc_udger_data(&self) -> Result<UdgerData> {
-        let capacity = NonZeroUsize::new(self.capacity).ok_or(anyhow!(
-            "LRU cache size is zero, please make sure it's greater than zero"
-        ))?;
+        let capacity = NonZeroUsize::new(self.capacity).ok_or_else(|| {
+            anyhow!("LRU cache size is zero, please make sure it's greater than zero")
+        })?;
 
         Ok(UdgerData {
             conn: Connection::open(&self.db_fpath)?,
-            #[cfg(application)]
+            #[cfg(feature = "application")]
             app_word_scratch: self.application_words_detector.alloc_scratch()?,
             client_word_scratch: self.client_words_detector.alloc_scratch()?,
             device_word_scratch: self.device_class_words_detector.alloc_scratch()?,
             os_word_scratch: self.os_words_detector.alloc_scratch()?,
-            #[cfg(application)]
+            #[cfg(feature = "application")]
             app_regex_scratch: self.application_regexes.alloc_scratch()?,
             client_regex_scratch: self.client_regexes.alloc_scratch()?,
             device_class_regex_scratch: self.device_class_regexes.alloc_scratch()?,
@@ -410,19 +396,19 @@ impl Udger {
             info.ua_uptodate_current_version = row.get(12).unwrap_or_default();
             info.ua_family = row.get(13)?;
             info.ua_family_code = row.get(14)?;
-            #[cfg(homepage)]
+            #[cfg(feature = "homepage")]
             {
                 info.ua_family_homepage = row.get(15)?;
-                info.ua_family_vendor_code_homepage = row.get(20)?;
+                info.ua_family_vendor_homepage = row.get(20)?;
             }
-            #[cfg(icon)]
+            #[cfg(feature = "icon")]
             {
                 info.ua_family_icon = row.get(16)?;
                 info.ua_family_icon_big = row.get(17)?;
             }
             info.ua_family_vendor = row.get(18)?;
             info.ua_family_vendor_code = row.get(19)?;
-            #[cfg(url)]
+            #[cfg(feature = "url")]
             {
                 info.ua_family_info_url = row.get(21)?;
             }
@@ -455,7 +441,7 @@ impl Udger {
         };
 
         let stmt = &mut data.conn.prepare(sql::SQL_CLIENT)?;
-        match stmt.query_row(params![row_id], |row| {
+        if let Err(err) = stmt.query_row(params![row_id], |row| {
             info.client_id = row.get(1)?;
             info.class_id = row.get(2)?;
             info.ua_class = row.get(3)?;
@@ -471,39 +457,36 @@ impl Udger {
             info.ua_uptodate_current_version = row.get(13)?;
             info.ua_family = row.get(14)?;
             info.ua_family_code = row.get(15)?;
-            #[cfg(homepage)]
+            #[cfg(feature = "homepage")]
             {
-                info.ua_family_code_homepage = row.get(16)?;
+                info.ua_family_homepage = row.get(16)?;
             }
-            #[cfg(icon)]
+            #[cfg(feature = "icon")]
             {
-                info.ua_family_code_icon = row.get(17)?;
-                info.ua_family_code_icon_big = row.get(18)?;
+                info.ua_family_icon = row.get(17)?;
+                info.ua_family_icon_big = row.get(18)?;
                 info.ua_family_vendor_homepage = row.get(21)?;
             }
             info.ua_family_vendor = row.get(19)?;
             info.ua_family_vendor_code = row.get(20)?;
-            #[cfg(url)]
+            #[cfg(feature = "url")]
             {
                 info.ua_family_info_url = row.get(22)?;
             }
             Ok(())
         }) {
-            Err(err) => {
-                match err {
-                    Error::QueryReturnedNoRows => {}
-                    _ => return Err(anyhow!(err)),
-                };
-            }
-            Ok(_) => {}
+            match err {
+                Error::QueryReturnedNoRows => {}
+                _ => return Err(anyhow!(err)),
+            };
         };
 
         match range {
             None => {}
             Some(range) => {
-                info.ua_version = (&ua.as_ref()[range]).to_string();
+                info.ua_version = (ua.as_ref()[range]).to_string();
                 info.ua.extend([' '].iter());
-                info.ua.extend(info.ua_version.chars());
+                info.ua.push_str(&info.ua_version);
                 let split: Vec<&str> = info.ua_version.split('.').collect();
                 info.ua_version_major = split[0].to_string();
             }
@@ -530,36 +513,33 @@ impl Udger {
         };
 
         let stmt = &mut data.conn.prepare(&sql::SQL_OS)?;
-        match stmt.query_row(params![row_id], |row| {
+        if let Err(err) = stmt.query_row(params![row_id], |row| {
             info.os_family = row.get(1)?;
             info.os_family_code = row.get(2)?;
             info.os = row.get(3)?;
             info.os_code = row.get(4)?;
-            #[cfg(homepage)]
+            #[cfg(feature = "homepage")]
             {
                 info.os_homepage = row.get(5)?;
                 info.os_family_vendor_homepage = row.get(10)?;
             }
-            #[cfg(icon)]
+            #[cfg(feature = "icon")]
             {
                 info.os_icon = row.get(6)?;
                 info.os_icon_big = row.get(7)?;
             }
             info.os_family_vendor = row.get(8)?;
             info.os_family_vendor_code = row.get(9)?;
-            #[cfg(url)]
+            #[cfg(feature = "url")]
             {
                 info.os_info_url = row.get(11)?;
             }
             Ok(())
         }) {
-            Err(err) => {
-                match err {
-                    Error::QueryReturnedNoRows => {}
-                    _ => return Err(anyhow!(err)),
-                };
-            }
-            Ok(_) => {}
+            match err {
+                Error::QueryReturnedNoRows => {}
+                _ => return Err(anyhow!(err)),
+            };
         };
 
         Ok(())
@@ -583,27 +563,24 @@ impl Udger {
                     None => {}
                     Some(class_id) => {
                         let stmt = &mut data.conn.prepare(&sql::SQL_CLIENT_CLASS)?;
-                        match stmt.query_row(params![class_id], |row| {
+                        if let Err(err) = stmt.query_row(params![class_id], |row| {
                             info.device_class = row.get(0)?;
                             info.device_class_code = row.get(1)?;
-                            #[cfg(icon)]
+                            #[cfg(feature = "icon")]
                             {
                                 info.device_class_icon = row.get(2)?;
                                 info.device_class_icon_big = row.get(3)?;
                             }
-                            #[cfg(url)]
+                            #[cfg(feature = "url")]
                             {
                                 info.device_class_info_url = row.get(4)?;
                             }
                             Ok(())
                         }) {
-                            Err(err) => {
-                                match err {
-                                    Error::QueryReturnedNoRows => {}
-                                    _ => return Err(anyhow!(err)),
-                                };
-                            }
-                            Ok(_) => {}
+                            match err {
+                                Error::QueryReturnedNoRows => {}
+                                _ => return Err(anyhow!(err)),
+                            };
                         };
                     }
                 };
@@ -613,27 +590,24 @@ impl Udger {
         };
 
         let stmt = &mut data.conn.prepare(&sql::SQL_DEVICE)?;
-        match stmt.query_row(params![row_id], |row| {
+        if let Err(err) = stmt.query_row(params![row_id], |row| {
             info.device_class = row.get(1)?;
             info.device_class_code = row.get(2)?;
-            #[cfg(icon)]
+            #[cfg(feature = "icon")]
             {
                 info.device_class_icon = row.get(3)?;
                 info.device_class_icon_big = row.get(4)?;
             }
-            #[cfg(url)]
+            #[cfg(feature = "url")]
             {
                 info.device_class_info_url = row.get(5)?;
             }
             Ok(())
         }) {
-            Err(err) => {
-                match err {
-                    Error::QueryReturnedNoRows => {}
-                    _ => return Err(anyhow!(err)),
-                };
-            }
-            Ok(_) => {}
+            match err {
+                Error::QueryReturnedNoRows => {}
+                _ => return Err(anyhow!(err)),
+            };
         };
 
         Ok(())
@@ -676,33 +650,30 @@ impl Udger {
         };
 
         let stmt = &mut data.conn.prepare(sql::SQL_DEVICE_NAME_LIST)?;
-        match stmt.query_row(params![id, &ua.as_ref()[capture]], |row| {
+        if let Err(err) = stmt.query_row(params![id, &ua.as_ref()[capture]], |row| {
             info.device_marketname = row.get(0).unwrap_or_default();
             info.device_brand_code = row.get(1).unwrap_or_default();
             info.device_brand = row.get(2).unwrap_or_default();
-            #[cfg(url)]
+            #[cfg(feature = "url")]
             {
-                info.device_brand_url = row.get(3).unwrap_or_default();
+                info.device_brand_info_url = row.get(3).unwrap_or_default();
             }
-            #[cfg(icon)]
+            #[cfg(feature = "icon")]
             {
                 info.device_brand_icon = row.get(4).unwrap_or_default();
                 info.device_brand_icon_big = row.get(5).unwrap_or_default();
             }
             Ok(())
         }) {
-            Err(err) => {
-                match err {
-                    Error::QueryReturnedNoRows => {}
-                    _ => return Err(anyhow!(err)),
-                };
-            }
-            Ok(_) => {}
+            match err {
+                Error::QueryReturnedNoRows => {}
+                _ => return Err(anyhow!(err)),
+            };
         };
         Ok(())
     }
 
-    #[cfg(application)]
+    #[cfg(feature = "application")]
     fn detect_application<T>(&self, ua: &T, data: &mut UdgerData, _info: &mut UaInfo) -> Result<()>
     where
         T: AsRef<str>,
@@ -719,17 +690,16 @@ impl Udger {
         // info.ua_string = ua.as_ref().to_string();
         // try to get cached ua info
         let ua = ua.as_ref().to_string();
-        match data.get(&ua) {
-            Some(cached) => return Ok(cached),
-            None => {}
-        };
+        if let Some(cached) = data.get(&ua) {
+            return Ok(cached);
+        }
 
         let mut info = Rc::new(UaInfo::default());
         Rc::get_mut(&mut info).unwrap().ua_string = ua.clone();
 
         self.detect_client(&ua, data, Rc::get_mut(&mut info).unwrap())?;
         self.detect_os(&ua, data, Rc::get_mut(&mut info).unwrap())?;
-        #[cfg(application)]
+        #[cfg(feature = "application")]
         {
             self.detect_application(&ua, data, Rc::get_mut(&mut info).unwrap())?;
         }
@@ -772,17 +742,17 @@ mod tests {
         assert_eq!(info.ua_family_code, "firefox");
         assert_eq!(info.ua_version, "40.0");
         assert_eq!(info.ua_version_major, "40");
-        #[cfg(homepage)]
+        #[cfg(feature = "homepage")]
         {
             assert_eq!(info.ua_family_homepage, "http://www.firefox.com/");
             assert_eq!(info.ua_family_vendor_homepage, "http://www.mozilla.org/");
         }
-        #[cfg(icon)]
+        #[cfg(feature = "icon")]
         {
             assert_eq!(info.ua_family_icon, "firefox.png");
             assert_eq!(info.ua_family_icon_big, "firefox_big.png");
         }
-        #[cfg(url)]
+        #[cfg(feature = "url")]
         {
             assert_eq!(
                 info.ua_family_info_url,
@@ -807,7 +777,7 @@ mod tests {
         assert_eq!(info.ua_family_vendor_code, "google_inc");
         assert_eq!(info.ua_version, "2.1");
         assert_eq!(info.ua_version_major, "2");
-        #[cfg(homepage)]
+        #[cfg(feature = "homepage")]
         {
             assert_eq!(info.ua_family_homepage, "http://www.google.com/bot.html");
             assert_eq!(
@@ -815,15 +785,15 @@ mod tests {
                 "https://www.google.com/about/company/"
             );
         }
-        #[cfg(icon)]
+        #[cfg(feature = "icon")]
         {
             assert_eq!(info.ua_family_icon, "bot_googlebot.png");
             assert_eq!(info.ua_family_icon_big, "");
         }
-        #[cfg(icon)]
+        #[cfg(feature = "icon")]
         {
             assert_eq!(
-                info.ua_family_url,
+                info.ua_family_info_url,
                 "https://udger.com/resources/ua-list/bot-detail?bot=Googlebot#id4966"
             );
         }
@@ -849,7 +819,7 @@ mod tests {
         assert_eq!(info.os_family_code, "windows");
         assert_eq!(info.os_family_vendor, "Microsoft Corporation.");
         assert_eq!(info.os_family_vendor_code, "microsoft_corporation");
-        #[cfg(homepage)]
+        #[cfg(feature = "homepage")]
         {
             assert_eq!(
                 info.os_family_vendor_homepage,
@@ -857,12 +827,12 @@ mod tests {
             );
             assert_eq!(info.os_homepage, "https://en.wikipedia.org/wiki/Windows_10");
         }
-        #[cfg(icon)]
+        #[cfg(feature = "icon")]
         {
             assert_eq!(info.os_icon, "windows10.png");
             assert_eq!(info.os_icon_big, "windows10_big.png");
         }
-        #[cfg(icon)]
+        #[cfg(feature = "icon")]
         {
             assert_eq!(
                 info.os_info_url,
@@ -893,12 +863,12 @@ mod tests {
 
         assert_eq!(info.device_class, "Tablet");
         assert_eq!(info.device_class_code, "tablet");
-        #[cfg(icon)]
+        #[cfg(feature = "icon")]
         {
             assert_eq!(info.device_class_icon, "tablet.png");
             assert_eq!(info.device_class_icon_big, "tablet_big.png");
         }
-        #[cfg(url)]
+        #[cfg(feature = "url")]
         {
             assert_eq!(
                 info.device_class_info_url,
@@ -945,16 +915,16 @@ mod tests {
 
         assert_eq!(info.device_brand, "Apple");
         assert_eq!(info.device_brand_code, "apple");
-        #[cfg(homepage)]
+        #[cfg(feature = "homepage")]
         {
             assert_eq!(info.device_brand_homepage, "http://www.apple.com/");
         }
-        #[cfg(icon)]
+        #[cfg(feature = "icon")]
         {
             assert_eq!(info.device_brand_icon, "apple.png");
             assert_eq!(info.device_brand_icon_big, "apple_big.png");
         }
-        #[cfg(url)]
+        #[cfg(feature = "url")]
         {
             assert_eq!(
                 info.device_brand_info_url,
@@ -976,7 +946,7 @@ mod tests {
         let info = udger.parse_ua(&ua, &mut data).unwrap();
         assert_eq!(info.ua_class, "unrecognized");
         assert_eq!(info.ua_class_code, "unrecognized");
-        #[cfg(application)]
+        #[cfg(feature = "application")]
         {
             assert_eq!(info.application_name, "");
             assert_eq!(info.application_version, "");

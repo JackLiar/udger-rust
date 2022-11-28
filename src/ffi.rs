@@ -5,9 +5,8 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 
 use libc::size_t;
-use serde::{Deserialize, Serialize};
 
-use super::udger::{Udger, UdgerData};
+use crate::{UaInfo, Udger, UdgerData};
 
 #[no_mangle]
 unsafe extern "C" fn udger_new(
@@ -30,12 +29,12 @@ unsafe extern "C" fn udger_new(
         Err(_) => rc = -1,
     }
     *_udger = Box::into_raw(u);
-    return rc;
+    rc
 }
 
 #[no_mangle]
 unsafe extern "C" fn udger_drop(udger: *mut Udger) {
-    if udger != std::ptr::null_mut() {
+    if !udger.is_null() {
         drop(Box::from_raw(udger))
     }
 }
@@ -77,90 +76,9 @@ unsafe extern "C" fn udger_data_alloc(
 
 #[no_mangle]
 unsafe extern "C" fn udger_data_drop(data: *mut UdgerData) {
-    if data != std::ptr::null_mut() {
+    if data.is_null() {
         drop(Box::from_raw(data))
     }
-}
-
-#[repr(C)]
-#[derive(Debug, Default, Deserialize, Serialize)]
-pub struct UaInfo {
-    #[serde(skip_serializing)]
-    pub class_id: Option<u32>,
-    #[serde(skip_serializing)]
-    pub client_id: Option<u32>,
-    pub ua_class: String,
-    pub ua_class_code: String,
-    pub ua: String,
-    pub ua_engine: String,
-    pub ua_version: String,
-    pub ua_version_major: String,
-    pub ua_version_minor: String,
-    pub crawler_last_seen: String,
-    pub crawler_respect_robotstxt: String,
-    pub crawler_category: String,
-    pub crawler_category_code: String,
-    pub ua_uptodate_current_version: String,
-    pub ua_family: String,
-    pub ua_family_code: String,
-    pub ua_family_vendor: String,
-    pub ua_family_vendor_code: String,
-    pub ua_string: String,
-
-    pub os_family: String,
-    pub os_family_code: String,
-    pub os: String,
-    pub os_code: String,
-    pub os_family_vendor: String,
-    pub os_family_vendor_code: String,
-
-    pub device_class: String,
-    pub device_class_code: String,
-    pub device_marketname: String,
-    pub device_brand: String,
-    pub device_brand_code: String,
-
-    #[cfg(application)]
-    pub application_name: String,
-    #[cfg(application)]
-    pub application_version: String,
-
-    #[cfg(icon)]
-    pub ua_family_icon: String,
-    #[cfg(icon)]
-    pub ua_family_icon_big: String,
-    #[cfg(icon)]
-    pub os_icon: String,
-    #[cfg(icon)]
-    pub os_icon_big: String,
-    #[cfg(icon)]
-    pub device_class_icon: String,
-    #[cfg(icon)]
-    pub device_class_icon_big: String,
-    #[cfg(icon)]
-    pub device_brand_icon: String,
-    #[cfg(icon)]
-    pub device_brand_icon_big: String,
-
-    #[cfg(homepage)]
-    pub ua_family_homepage: String,
-    #[cfg(homepage)]
-    pub ua_family_vendor_homepage: String,
-    #[cfg(homepage)]
-    pub os_homepage: String,
-    #[cfg(homepage)]
-    pub os_family_vendor_homepage: String,
-    #[cfg(homepage)]
-    pub device_brand_homepage: String,
-
-    #[cfg(url)]
-    pub ua_family_info_url: String,
-    #[cfg(url)]
-    pub os_info_url: String,
-    #[cfg(url)]
-    pub device_class_info_url: String,
-    #[cfg(url)]
-    pub device_brand_info_url: String,
 }
 
 macro_rules! get_function {
@@ -216,61 +134,67 @@ get_function!(ua_info_get_device_marketname, device_marketname);
 get_function!(ua_info_get_device_brand, device_brand);
 get_function!(ua_info_get_device_brand_code, device_brand_code);
 
-#[cfg(application)]
+#[cfg(feature = "application")]
 get_function!(ua_info_get_application_name, application_name);
 
-#[cfg(application)]
+#[cfg(feature = "application")]
 get_function!(ua_info_get_application_version, application_version);
 
-#[cfg(icon)]
-get_function!(ua_info_get_os_family_icon, os_family_icon);
+#[cfg(feature = "icon")]
+get_function!(ua_info_get_ua_family_icon, ua_family_icon);
 
-#[cfg(icon)]
-get_function!(ua_info_get_os_family_icon_big, os_family_icon_big);
+#[cfg(feature = "icon")]
+get_function!(ua_info_get_ua_family_icon_big, ua_family_icon_big);
 
-#[cfg(icon)]
+#[cfg(feature = "icon")]
 get_function!(ua_info_get_os_icon, os_icon);
 
-#[cfg(icon)]
+#[cfg(feature = "icon")]
 get_function!(ua_info_get_os_icon_big, os_icon_big);
 
-#[cfg(icon)]
+#[cfg(feature = "icon")]
 get_function!(ua_info_get_device_class_icon, device_class_icon);
 
-#[cfg(icon)]
+#[cfg(feature = "icon")]
 get_function!(ua_info_get_device_class_icon_big, device_class_icon_big);
 
-#[cfg(icon)]
+#[cfg(feature = "icon")]
 get_function!(ua_info_get_device_brand_icon, device_brand_icon);
 
-#[cfg(icon)]
+#[cfg(feature = "icon")]
 get_function!(ua_info_get_device_brand_icon_big, device_brand_icon_big);
 
-#[cfg(homepage)]
-get_function!(ua_info_get_os_family_homepage, os_family_homepage);
-
-#[cfg(homepage)]
+#[cfg(feature = "homepage")]
 get_function!(ua_info_get_os_homepage, os_homepage);
 
-#[cfg(homepage)]
+#[cfg(feature = "homepage")]
+get_function!(ua_info_get_ua_family_homepage, ua_family_homepage);
+
+#[cfg(feature = "homepage")]
 get_function!(
-    ua_info_get_os_familiy_vendor_homepage,
-    os_familiy_vendor_homepage
+    ua_info_get_ua_family_vendor_homepage,
+    ua_family_vendor_homepage
 );
 
-#[cfg(homepage)]
+#[cfg(feature = "homepage")]
+get_function!(
+    ua_info_get_os_family_vendor_homepage,
+    os_family_vendor_homepage
+);
+
+#[cfg(feature = "homepage")]
 get_function!(ua_info_get_device_brand_homepage, device_brand_homepage);
 
-#[cfg(url)]
+#[cfg(feature = "url")]
 get_function!(ua_info_get_ua_family_info_url, ua_family_info_url);
 
-#[cfg(url)]
+#[cfg(feature = "url")]
 get_function!(ua_info_get_os_info_url, os_info_url);
 
-#[cfg(url)]
+#[cfg(feature = "url")]
 get_function!(ua_info_get_device_class_info_url, device_class_info_url);
 
-#[cfg(url)]
+#[cfg(feature = "url")]
 get_function!(ua_info_get_device_brand_info_url, device_brand_info_url);
 
 #[no_mangle]
@@ -335,17 +259,11 @@ mod tests {
         }
 
         unsafe {
-            #[cfg(application)]
-            assert_eq!(
-                ua_info_get_application_name(&info as *const UaInfo),
-                info.application_name.as_ptr() as *const c_char
-            );
+            #[cfg(feature = "application")]
+            test_get_function!(ua_info_get_application_name, application_name);
 
-            #[cfg(application)]
-            assert_eq!(
-                ua_info_get_application_version(&info as *const UaInfo),
-                info.application_version.as_ptr() as *const c_char
-            );
+            #[cfg(feature = "application")]
+            test_get_function!(ua_info_get_application_version, application_version);
 
             test_get_function!(ua_info_get_crawler_category, crawler_category);
             test_get_function!(ua_info_get_crawler_category_code, crawler_category_code);
@@ -387,25 +305,25 @@ mod tests {
             test_get_function!(ua_info_get_ua_version_major, ua_version_major);
             test_get_function!(ua_info_get_ua_version_minor, ua_version_minor);
 
-            #[cfg(icon)]
+            #[cfg(feature = "icon")]
             {
-                test_get_function!(ua_info_get_device_brand_icon, ua_device_brand_icon);
-                test_get_function!(ua_info_get_device_brand_icon_big, ua_device_brand_icon_big);
-                test_get_function!(ua_info_get_device_class_icon, ua_device_class_icon);
-                test_get_function!(ua_info_get_device_class_icon_big, ua_device_class_icon_big);
-                test_get_function!(ua_info_get_os_icon, ua_os_icon);
-                test_get_function!(ua_info_get_os_icon_big, ua_os_icon_big);
+                test_get_function!(ua_info_get_device_brand_icon, device_brand_icon);
+                test_get_function!(ua_info_get_device_brand_icon_big, device_brand_icon_big);
+                test_get_function!(ua_info_get_device_class_icon, device_class_icon);
+                test_get_function!(ua_info_get_device_class_icon_big, device_class_icon_big);
+                test_get_function!(ua_info_get_os_icon, os_icon);
+                test_get_function!(ua_info_get_os_icon_big, os_icon_big);
                 test_get_function!(ua_info_get_ua_family_icon, ua_family_icon);
                 test_get_function!(ua_info_get_ua_family_icon_big, ua_family_icon_big);
             }
 
-            #[cfg(homepage)]
+            #[cfg(feature = "homepage")]
             {
-                test_get_function!(ua_info_get_device_brand_homepage, ua_device_brand_homepage);
-                test_get_function!(ua_info_get_os_homepage, ua_os_homepage);
+                test_get_function!(ua_info_get_device_brand_homepage, device_brand_homepage);
+                test_get_function!(ua_info_get_os_homepage, os_homepage);
                 test_get_function!(
                     ua_info_get_os_family_vendor_homepage,
-                    ua_os_family_vendor_homepage
+                    os_family_vendor_homepage
                 );
                 test_get_function!(ua_info_get_ua_family_homepage, ua_family_homepage);
                 test_get_function!(
@@ -414,28 +332,13 @@ mod tests {
                 );
             }
 
-            #[cfg(url)]
+            #[cfg(feature = "url")]
             {
-                test_get_function!(ua_info_get_device_brand_info_url, ua_device_brand_info_url);
-                test_get_function!(ua_info_get_device_class_info_url, ua_device_class_info_url);
-                test_get_function!(ua_info_get_os_info_url, ua_os_info_url);
+                test_get_function!(ua_info_get_device_brand_info_url, device_brand_info_url);
+                test_get_function!(ua_info_get_device_class_info_url, device_class_info_url);
+                test_get_function!(ua_info_get_os_info_url, os_info_url);
                 test_get_function!(ua_info_get_ua_family_info_url, ua_family_info_url);
             }
         }
-    }
-
-    #[test]
-    fn test_to_string() {
-        let mut info = UaInfo::default();
-        info.ua = String::from("wget/1.20.3");
-        let mut output: *mut c_char = std::ptr::null_mut();
-        let mut len: usize = 0;
-        let output_string: String;
-        unsafe {
-            ua_info_to_string(&info, &mut output, &mut len, false);
-            output_string = String::from_raw_parts(output as *mut u8, len - 1, len - 1);
-        }
-
-        assert_eq!(output_string, "{\"ua_class\":\"\",\"ua_class_code\":\"\",\"ua\":\"wget/1.20.3\",\"ua_engine\":\"\",\"ua_version\":\"\",\"ua_version_major\":\"\",\"ua_version_minor\":\"\",\"crawler_last_seen\":\"\",\"crawler_respect_robotstxt\":\"\",\"crawler_category\":\"\",\"crawler_category_code\":\"\",\"ua_uptodate_current_version\":\"\",\"ua_family\":\"\",\"ua_family_code\":\"\",\"ua_family_vendor\":\"\",\"ua_family_vendor_code\":\"\",\"ua_string\":\"\",\"os_family\":\"\",\"os_family_code\":\"\",\"os\":\"\",\"os_code\":\"\",\"os_family_vendor\":\"\",\"os_family_vendor_code\":\"\",\"device_class\":\"\",\"device_class_code\":\"\",\"device_marketname\":\"\",\"device_brand\":\"\",\"device_brand_code\":\"\"}");
     }
 }

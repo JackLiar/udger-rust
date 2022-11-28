@@ -10,10 +10,7 @@ pub struct WordDetectorScratch {
 
 impl WordDetectorScratch {
     pub fn new(name: String, scratch: Scratch) -> WordDetectorScratch {
-        WordDetectorScratch {
-            name: name,
-            raw: scratch,
-        }
+        WordDetectorScratch { name, raw: scratch }
     }
 }
 
@@ -25,11 +22,6 @@ pub struct WordDetector {
 }
 
 impl WordDetector {
-    /// Create a new WordDetector
-    pub fn new() -> WordDetector {
-        WordDetector::default()
-    }
-
     /// Initialize a WordDetector
     ///
     /// # Arguments
@@ -68,7 +60,7 @@ impl WordDetector {
         match &self.db {
             None => {}
             Some(db) => {
-                db.scan(ua.as_ref(), &mut scratch.raw, |id, _from, _to, _flag| {
+                db.scan(ua.as_ref(), &scratch.raw, |id, _from, _to, _flag| {
                     let count = match self.id_count_map.get(&(id as u16)) {
                         None => return Matching::Continue,
                         Some(count) => *count,
@@ -80,15 +72,7 @@ impl WordDetector {
         }
 
         // sort ids by sequence, decreasing order
-        id_counts.sort_by(|s, o| {
-            if s.1 > o.1 {
-                std::cmp::Ordering::Less
-            } else if s.1 < o.1 {
-                std::cmp::Ordering::Greater
-            } else {
-                std::cmp::Ordering::Equal
-            }
-        });
+        id_counts.sort_by(|s, o| s.1.cmp(&o.1));
 
         Ok(id_counts.iter().map(|(id, _)| *id).collect())
     }
@@ -102,19 +86,19 @@ mod tests {
 
     #[test]
     fn test_get_word_ids() {
-        let mut detector = WordDetector::new();
+        let mut detector = WordDetector::default();
         let words = vec![
             Pattern {
                 expression: String::from("regex"),
                 flags: PatternFlags::CASELESS,
-                id: Some(123 as usize),
+                id: Some(123_usize),
                 ext: ExprExt::default(),
                 som: None,
             },
             Pattern {
                 expression: String::from("ex"),
                 flags: PatternFlags::CASELESS,
-                id: Some(321 as usize),
+                id: Some(321_usize),
                 ext: ExprExt::default(),
                 som: None,
             },
@@ -137,7 +121,7 @@ mod tests {
 
         assert!(matches!(ids.iter().find(|id| **id == 123), Some(_)));
         assert!(matches!(ids.iter().find(|id| **id == 321), Some(_)));
-        assert_eq!(*ids.get(0).unwrap(), 321);
+        assert_eq!(*ids.first().unwrap(), 321);
         assert_eq!(*ids.get(1).unwrap(), 123);
     }
 }
