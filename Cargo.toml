@@ -9,16 +9,16 @@ crate-type = ["cdylib", "rlib"]
 name = "udger"
 
 [dependencies]
-anyhow = "1.0"
+anyhow = "1"
 # uchardet = "2.0.4"
 clru = "0.6"
 hyperscan = { version = "0.3", features = ["chimera"] }
-lazy_static = "1.4.0"
+lazy_static = "1"
 libc = "0.2"
-regex = "1.7"
-rusqlite = { version = "0.28", features = ["bundled"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+regex = "1"
+rusqlite = { version = "0.30", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [dev-dependencies]
 rand = "0.8"
